@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Defaults to English and Dark Mode -->
 <html lang="en" dir="ltr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8" />
@@ -203,6 +204,14 @@
                         </div>
                     </div>
 
+                    <!-- Progress Status Area -->
+                    <div id="upload-progress-container" class="mt-4 hidden">
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                            <div id="upload-progress-bar" class="bg-sky-500 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+                        </div>
+                        <p id="upload-progress-text" class="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center font-medium"></p>
+                    </div>
+
                     <button id="convert-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
                         <iconify-icon id="convert-icon" icon="mdi:refresh"></iconify-icon>
                         <span id="convert-btn-text" data-key="convertBtn">Convert to Text</span>
@@ -230,8 +239,9 @@
                     </div>
                     <div id="output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
                         <p id="output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="outputPlaceholder">converted text will appear here</p>
-                        <div id="loader" class="flex hidden">
+                        <div id="loader" class="flex flex-col items-center justify-center gap-2 hidden">
                             <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
+                            <span id="result-loader-text" class="text-xs text-slate-500 dark:text-slate-400 font-semibold"></span>
                         </div>
                         <textarea id="output-text-area" class="min-h-[200px] hidden"></textarea>
                     </div>
@@ -433,6 +443,10 @@
                 toastIcon: document.getElementById('toast-icon'),
                 toastMessage: document.getElementById('toast-message'),
                 loader: document.getElementById('loader'),
+                resultLoaderText: document.getElementById('result-loader-text'),
+                uploadProgressContainer: document.getElementById('upload-progress-container'),
+                uploadProgressBar: document.getElementById('upload-progress-bar'),
+                uploadProgressText: document.getElementById('upload-progress-text'),
                 translateBtn: document.getElementById('translate-btn'),
                 translateIcon: document.getElementById('translate-icon'),
                 translateLangSelect: document.getElementById('translate-language-select'),
@@ -542,7 +556,11 @@
                     msgFetchModelsSuccess: "Models loaded successfully!",
                     msgFetchModelsError: "Failed to fetch models. Please check your API key.",
                     msgNoModelsFound: "No models available for this provider.",
+                    msgNoModelsYet: "Enter your API key and click \"Save & Activate\" to load models.",
                     msgFetchingModels: "Fetching models...",
+                    msgCopyError: "Failed to copy text.",
+                    msgUploading: (percent, uploaded, total, speed) => `Uploading: ${percent}% (${uploaded} / ${total} MB) - Speed: ${speed} MB/s`,
+                    msgProcessingModel: "Uploading finished! Processing file with AI model...",
                 },
                 fa: {
                     pageTitle: "تبدیل محتوا به متن",
@@ -622,7 +640,11 @@
                     msgFetchModelsSuccess: "مدل‌ها با موفقیت بارگذاری شدند!",
                     msgFetchModelsError: "خطا در دریافت مدل‌ها. لطفاً کلید API را بررسی کنید.",
                     msgNoModelsFound: "هیچ مدلی برای این سرویس‌دهنده در دسترس نیست.",
+                    msgNoModelsYet: "کلید API خود را وارد کرده و روی «ذخیره و فعال‌سازی» کلیک کنید تا مدل‌ها بارگذاری شوند.",
                     msgFetchingModels: "در حال دریافت مدل‌ها...",
+                    msgCopyError: "کپی کردن متن با خطا مواجه شد.",
+                    msgUploading: (percent, uploaded, total, speed) => `در حال آپلود: ${percent}% (${uploaded} از ${total} مگابایت) - سرعت: ${speed} MB/s`,
+                    msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است...",
                 }
             };
 
@@ -653,10 +675,16 @@
                 dom.html.classList.toggle('dark', theme === 'dark');
             }
 
-            function showMessage(titleKey, messageKey, isError = true, messageArgs) {
+            function showMessage(titleKey, messageKeyOrText, isError = true, messageArgs, isRawText = false) {
                 const title = translations[currentLang][titleKey];
-                let message = translations[currentLang][messageKey];
-                if (typeof message === 'function') message = message(messageArgs);
+                let message;
+                if (isRawText) {
+                    message = messageKeyOrText;
+                } else {
+                    message = translations[currentLang][messageKeyOrText];
+                    if (typeof message === 'function') message = message(messageArgs);
+                    if (message === undefined) message = messageKeyOrText;
+                }
                 dom.modalTitle.textContent = title;
                 dom.modalMessage.textContent = message;
                 dom.modalTitle.classList.toggle('text-red-500', isError);
@@ -682,9 +710,6 @@
                 if (apiKey && apiProvider) {
                     dom.apiKeyInput.value = apiKey;
                     dom.apiProviderSelect.value = apiProvider;
-                    if (apiModel) {
-                        // مدل در populateModelSelect تنظیم خواهد شد
-                    }
                     dom.mainAppWrapper.classList.remove('disabled-section');
                 }
             }
@@ -752,34 +777,61 @@
                 }
             }
 
-            async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        if (response.ok) return response;
-                        const isRetryableStatus = [429, 500, 502, 503, 504].includes(response.status);
-                        let errorData;
-                        try {
-                            errorData = await response.json();
-                        } catch (e) {
-                            errorData = { error: { message: response.statusText } };
-                        }
-                        const errorMessage = errorData.error?.message || '';
-                        const isOverloaded = errorMessage.toLowerCase().includes('overloaded') || errorMessage.toLowerCase().includes('try again');
-                        if (!isRetryableStatus && !isOverloaded) {
-                            throw new Error(errorMessage || `HTTP Error: ${response.status}`);
-                        }
-                        if (i === retries - 1) {
-                            throw new Error(errorMessage || `API is overloaded. Please try again later.`);
-                        }
-                        const delay = backoff * Math.pow(2, i);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } catch (error) {
-                        if (i === retries - 1) throw error;
-                        const delay = backoff * Math.pow(2, i);
-                        await new Promise(resolve => setTimeout(resolve, delay));
+            // XHR Wrapper to accurately track upload progress over network
+            function xhrRequest({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open(method, url);
+
+                    Object.keys(headers).forEach(key => {
+                        xhr.setRequestHeader(key, headers[key]);
+                    });
+
+                    let startTime = Date.now();
+                    let lastLoaded = 0;
+
+                    if (xhr.upload && onUploadProgress) {
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const now = Date.now();
+                                const timeDiff = (now - startTime) / 1000; // in seconds
+                                const loadedDiff = e.loaded - lastLoaded;
+
+                                let speedMBps = 0;
+                                if (timeDiff > 0) {
+                                    speedMBps = ((e.loaded / (1024 * 1024)) / timeDiff).toFixed(2);
+                                }
+
+                                const percent = Math.round((e.loaded / e.total) * 100);
+                                const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+                                const totalMB = (e.total / (1024 * 1024)).toFixed(2);
+
+                                onUploadProgress({ percent, uploadedMB, totalMB, speedMBps });
+                            }
+                        };
                     }
-                }
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                resolve(response);
+                            } catch (e) {
+                                resolve(xhr.responseText);
+                            }
+                        } else {
+                            let errorMsg = xhr.statusText;
+                            try {
+                                const errData = JSON.parse(xhr.responseText);
+                                errorMsg = errData.error?.message || errorMsg;
+                            } catch (e) { }
+                            reject(new Error(errorMsg || `HTTP Error: ${xhr.status}`));
+                        }
+                    };
+
+                    xhr.onerror = () => reject(new Error('Network error occurred.'));
+                    xhr.send(body);
+                });
             }
 
             async function fetchAvailableModels(provider, apiKey) {
@@ -790,7 +842,6 @@
                             const response = await fetch(url);
                             if (!response.ok) throw new Error('Failed to fetch Gemini models');
                             const data = await response.json();
-                            // فیلتر کردن مدل‌هایی که از generateContent پشتیبانی می‌کنند
                             return data.models
                                 .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
                                 .map(model => ({
@@ -806,7 +857,6 @@
                             });
                             if (!response.ok) throw new Error('Failed to fetch OpenAI models');
                             const data = await response.json();
-                            // فیلتر کردن مدل‌های مفید برای تبدیل متن
                             const usefulModels = ['gpt-4', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-3.5-turbo', 'whisper-1'];
                             return data.data
                                 .filter(model => usefulModels.some(um => model.id.includes(um)))
@@ -817,13 +867,21 @@
                                 }));
                         }
                         case 'claude': {
-                            // Claude مدل‌های ثابتی دارد که می‌توانیم لیست کنیم
-                            const claudeModels = [
-                                { id: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus', description: 'Most powerful' },
-                                { id: 'claude-3-sonnet-20240229', displayName: 'Claude 3 Sonnet', description: 'Balanced' },
-                                { id: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku', description: 'Fastest' }
-                            ];
-                            return claudeModels;
+                            const url = 'https://api.anthropic.com/v1/models?limit=1000';
+                            const response = await fetch(url, {
+                                headers: {
+                                    'x-api-key': apiKey,
+                                    'anthropic-version': '2023-06-01',
+                                    'anthropic-dangerous-direct-browser-access': 'true'
+                                }
+                            });
+                            if (!response.ok) throw new Error('Failed to fetch Claude models');
+                            const data = await response.json();
+                            return (data.data || []).map(model => ({
+                                id: model.id,
+                                displayName: model.display_name || model.id,
+                                description: ''
+                            }));
                         }
                         default:
                             throw new Error('Unsupported provider');
@@ -834,39 +892,14 @@
                 }
             }
 
-            function getDefaultModels(provider) {
-                switch (provider) {
-                    case 'gemini':
-                        return [
-                            { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', description: 'Latest Flash model' },
-                            { id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', description: 'Most capable' },
-                            { id: 'gemini-2.0-flash-lite', displayName: 'Gemini 2.0 Flash Lite', description: 'Lightweight' }
-                        ];
-                    case 'openai':
-                        return [
-                            { id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo', description: 'Most capable' },
-                            { id: 'gpt-4', displayName: 'GPT-4', description: 'Balanced' },
-                            { id: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo', description: 'Fast' }
-                        ];
-                    case 'claude':
-                        return [
-                            { id: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus', description: 'Most powerful' },
-                            { id: 'claude-3-sonnet-20240229', displayName: 'Claude 3 Sonnet', description: 'Balanced' },
-                            { id: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku', description: 'Fastest' }
-                        ];
-                    default:
-                        return [];
-                }
-            }
-
-            function populateModelSelect(models, selectedModel = null) {
+            function populateModelSelect(models, selectedModel = null, emptyMessageKey = 'msgNoModelsFound') {
                 const modelSelect = dom.apiModelSelect;
                 modelSelect.innerHTML = '';
 
                 if (!models || models.length === 0) {
                     const option = document.createElement('option');
                     option.value = '';
-                    option.textContent = translations[currentLang].msgNoModelsFound;
+                    option.textContent = translations[currentLang][emptyMessageKey];
                     modelSelect.appendChild(option);
                     return;
                 }
@@ -892,9 +925,28 @@
                 } catch (error) {
                     console.error('Error fetching models:', error);
                     showMessage('msgErrorTitle', 'msgFetchModelsError');
-                    // در صورت خطا، مدل‌های پیش‌فرض را نمایش بده
-                    const defaultModels = getDefaultModels(provider);
-                    populateModelSelect(defaultModels);
+                    populateModelSelect([]);
+                }
+            }
+
+            function updateProgressUI(info) {
+                dom.uploadProgressContainer.classList.remove('hidden');
+                dom.uploadProgressBar.style.width = `${info.percent}%`;
+
+                const progressText = translations[currentLang].msgUploading(
+                    info.percent,
+                    info.uploadedMB,
+                    info.totalMB,
+                    info.speedMBps
+                );
+
+                dom.uploadProgressText.textContent = progressText;
+                dom.resultLoaderText.textContent = progressText;
+
+                if (info.percent >= 100) {
+                    const processingText = translations[currentLang].msgProcessingModel;
+                    dom.uploadProgressText.textContent = processingText;
+                    dom.resultLoaderText.textContent = processingText;
                 }
             }
 
@@ -910,10 +962,19 @@
                     parts.push({ inline_data: { mime_type: selectedFile.type, data: base64Data } });
                 }
                 const payload = { contents: [{ parts }] };
-                const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await response.json();
+
+                const data = await xhrRequest({
+                    url,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    onUploadProgress: (info) => !textInput && updateProgressUI(info)
+                });
+
+                if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
                 if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
-                if (data.candidates?.[0]?.finishReason !== 'STOP') throw new Error(translations[currentLang].msgModelStopped(data.candidates[0].finishReason));
+                if (data.promptFeedback?.blockReason) throw new Error(translations[currentLang].msgModelStopped(data.promptFeedback.blockReason));
+                if (!data.candidates?.[0]) throw new Error(translations[currentLang].msgNoTextReturned);
+                if (data.candidates[0].finishReason !== 'STOP') throw new Error(translations[currentLang].msgModelStopped(data.candidates[0].finishReason));
                 return translations[currentLang].msgNoTextReturned;
             }
 
@@ -924,8 +985,13 @@
                 if (textInput) {
                     const url = 'https://api.openai.com/v1/chat/completions';
                     const payload = { model: apiModel, messages: [{ role: "system", content: prompt }, { role: "user", content: textInput }] };
-                    const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
-                    const data = await response.json();
+                    const data = await xhrRequest({
+                        url,
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify(payload)
+                    });
+                    if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
+                    if (!data.choices?.[0]?.message?.content) throw new Error(translations[currentLang].msgNoTextReturned);
                     return data.choices[0].message.content;
                 } else {
                     const fileType = selectedFile.type.split('/')[0];
@@ -936,16 +1002,32 @@
                         formData.append('model', 'whisper-1');
                         const language = document.getElementById('language-select').value;
                         if (language !== 'auto') formData.append('language', language);
-                        const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}` }, body: formData });
-                        const data = await response.json();
+
+                        const data = await xhrRequest({
+                            url,
+                            headers: { 'Authorization': `Bearer ${apiKey}` },
+                            body: formData,
+                            onUploadProgress: (info) => updateProgressUI(info)
+                        });
+
+                        if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
+                        if (!data.text) throw new Error(translations[currentLang].msgNoTextReturned);
                         return data.text;
                     } else {
                         const model = apiModel.includes('vision') ? apiModel : 'gpt-4-vision-preview';
                         const url = 'https://api.openai.com/v1/chat/completions';
                         const base64Data = await fileToBase64(selectedFile);
                         const payload = { model: model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${selectedFile.type};base64,${base64Data}` } }] }], max_tokens: 1000 };
-                        const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
-                        const data = await response.json();
+
+                        const data = await xhrRequest({
+                            url,
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                            body: JSON.stringify(payload),
+                            onUploadProgress: (info) => updateProgressUI(info)
+                        });
+
+                        if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
+                        if (!data.choices?.[0]?.message?.content) throw new Error(translations[currentLang].msgNoTextReturned);
                         return data.choices[0].message.content;
                     }
                 }
@@ -965,8 +1047,16 @@
                     content.push({ type: "text", text: prompt });
                 }
                 const payload = { model: apiModel, max_tokens: 2048, messages: [{ role: "user", content }] };
-                const response = await fetchWithRetry(url, { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await response.json();
+
+                const data = await xhrRequest({
+                    url,
+                    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+                    body: JSON.stringify(payload),
+                    onUploadProgress: (info) => !textInput && updateProgressUI(info)
+                });
+
+                if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
+                if (!data.content?.[0]?.text) throw new Error(translations[currentLang].msgNoTextReturned);
                 return data.content[0].text;
             }
 
@@ -989,6 +1079,10 @@
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'msgTranslating' : 'msgConverting'];
                 if (!isTranslate) {
                     btn.querySelector('iconify-icon').classList.add('animate-spin');
+                    dom.uploadProgressContainer.classList.remove('hidden');
+                    dom.uploadProgressBar.style.width = '0%';
+                    dom.uploadProgressText.textContent = '';
+                    dom.resultLoaderText.textContent = '';
                 }
                 placeholder.classList.add('hidden');
                 outputArea.classList.add('hidden');
@@ -1003,6 +1097,7 @@
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'translateBtn' : 'convertBtn'];
                 if (!isTranslate) {
                     btn.querySelector('iconify-icon').classList.remove('animate-spin');
+                    dom.uploadProgressContainer.classList.add('hidden');
                 }
                 loader.classList.add('hidden');
                 outputArea.classList.remove('hidden');
@@ -1025,7 +1120,7 @@
                     document.execCommand('copy');
                     showToast('msgCopySuccess');
                 } catch (err) {
-                    showMessage('msgErrorTitle', 'msgCopyError');
+                    showMessage('msgErrorTitle', 'msgCopyError', true);
                 }
                 document.body.removeChild(textArea);
             }
@@ -1159,21 +1254,15 @@
                 checkApiKey();
                 loadHistory();
 
-                // بارگذاری مدل ذخیره‌شده
-                const savedModel = localStorage.getItem('apiModel');
                 const savedProvider = localStorage.getItem('apiProvider');
                 const savedApiKey = localStorage.getItem('apiKey');
 
                 if (savedApiKey && savedProvider) {
                     fetchAndPopulateModels(savedProvider, savedApiKey);
                 } else {
-                    // نمایش مدل‌های پیش‌فرض برای provider انتخاب‌شده
-                    const provider = dom.apiProviderSelect.value;
-                    const defaultModels = getDefaultModels(provider);
-                    populateModelSelect(defaultModels, savedModel);
+                    populateModelSelect([], null, 'msgNoModelsYet');
                 }
 
-                // Attach all event listeners
                 dom.saveApiKeyBtn.addEventListener('click', () => {
                     const apiKey = dom.apiKeyInput.value.trim();
                     const apiProvider = dom.apiProviderSelect.value;
@@ -1188,10 +1277,7 @@
                         dom.mainAppWrapper.classList.remove('disabled-section');
                         showToast('msgApiKeySuccess');
 
-                        // اگر مدلی انتخاب نشده بود، مدل‌ها را دریافت کن
-                        if (!apiModel) {
-                            fetchAndPopulateModels(apiProvider, apiKey);
-                        }
+                        fetchAndPopulateModels(apiProvider, apiKey);
                     } else {
                         showMessage('msgErrorTitle', 'msgApiKeyError');
                     }
@@ -1215,9 +1301,7 @@
                     if (apiKey) {
                         fetchAndPopulateModels(provider, apiKey);
                     } else {
-                        // نمایش مدل‌های پیش‌فرض
-                        const defaultModels = getDefaultModels(provider);
-                        populateModelSelect(defaultModels);
+                        populateModelSelect([], null, 'msgNoModelsYet');
                     }
                 });
 
@@ -1253,12 +1337,13 @@
                         saveHistory('transcription');
                     } catch (error) {
                         console.error('API Error:', error);
-                        if (error.message.toLowerCase().includes('api key')) {
+                        if (error.message && error.message.toLowerCase().includes('api key')) {
                             showMessage('msgErrorTitle', 'msgInvalidApiKeyError');
                         } else {
-                            showMessage('msgApiErrorTitle', error.message || 'msgUnknownError');
+                            const errorText = error.message || translations[currentLang].msgUnknownError;
+                            showMessage('msgApiErrorTitle', errorText, true, undefined, true);
                         }
-                        dom.outputText.value = error.message;
+                        dom.outputText.value = error.message || translations[currentLang].msgUnknownError;
                     } finally {
                         stopLoading();
                     }
@@ -1279,12 +1364,13 @@
                         saveHistory('translation');
                     } catch (error) {
                         console.error('Translation Error:', error);
-                        if (error.message.toLowerCase().includes('api key')) {
+                        if (error.message && error.message.toLowerCase().includes('api key')) {
                             showMessage('msgErrorTitle', 'msgInvalidApiKeyError');
                         } else {
-                            showMessage('msgApiErrorTitle', error.message || 'msgUnknownError');
+                            const errorText = error.message || translations[currentLang].msgUnknownError;
+                            showMessage('msgApiErrorTitle', errorText, true, undefined, true);
                         }
-                        dom.translateOutputArea.value = error.message;
+                        dom.translateOutputArea.value = error.message || translations[currentLang].msgUnknownError;
                     } finally {
                         stopLoading(true);
                     }

@@ -25,6 +25,38 @@
             font-family: 'Vazirmatn', sans-serif;
         }
 
+        /* Custom Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
         /* Glow Effect Styles */
         .glow-card {
             position: relative;
@@ -105,22 +137,91 @@
             font-family: inherit;
         }
 
-        /* Custom Select Arrow */
-        .custom-select {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
+        /* Fully Custom Dropdown Styling */
+        .custom-dropdown {
+            position: relative;
+            user-select: none;
+        }
+
+        .custom-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            height: 50px;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .custom-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            max-height: 240px;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .dark .custom-dropdown-menu {
+            background-color: #1e293b;
+            border-color: #475569;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        }
+
+        .custom-dropdown.open .custom-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .custom-dropdown-item {
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            color: #1e293b;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .dark .custom-dropdown-item {
+            color: #f1f5f9;
+        }
+
+        .custom-dropdown-item:first-child {
+            border-top-left-radius: 0.65rem;
+            border-top-right-radius: 0.65rem;
+        }
+
+        .custom-dropdown-item:last-child {
+            border-bottom-left-radius: 0.65rem;
+            border-bottom-right-radius: 0.65rem;
+        }
+
+        .custom-dropdown-item:hover,
+        .custom-dropdown-item.selected {
+            background-color: #0ea5e9 !important;
+            color: #ffffff !important;
         }
     </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300 min-h-screen flex flex-col justify-between">
 
-    <div id="main-container" class="max-w-4xl mx-auto p-4 md:p-8">
+    <div id="main-container" class="max-w-4xl mx-auto p-4 md:p-8 w-full">
 
         <header class="text-center mb-10 relative">
             <h1 class="text-4xl font-bold text-slate-800 dark:text-white mx-12" data-key="mainTitle">Content-to-Text Converter</h1>
             <p class="text-lg mt-2 text-slate-600 dark:text-slate-300" data-key="subTitle">Easily convert your audio, image, and video files to text.</p>
-            <button id="reset-app-btn" class="absolute top-0 right-0 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="resetAppBtnTooltip" title="Reset Application">
+            <button id="reset-app-btn" class="absolute top-0 right-0 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800" data-key="resetAppBtnTooltip" title="Reset Application">
                 <iconify-icon icon="mdi:power" width="24" height="24"></iconify-icon>
             </button>
         </header>
@@ -130,44 +231,59 @@
             <!-- API Settings Section -->
             <section id="api-settings" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
                 <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-white" data-key="apiSettingsTitle">1. API Settings</h2>
+
+                <!-- Layout Grid (3 units per row system) -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div>
-                        <label for="api-provider" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiProviderLabel">API Provider</label>
-                        <div class="relative">
-                            <select id="api-provider" class="custom-select w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <option value="gemini">Gemini</option>
+                    <!-- Provider: 1 unit -->
+                    <div class="md:col-span-1">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiProviderLabel">API Provider</label>
+                        <!-- Custom Dropdown Container -->
+                        <div id="api-provider-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <span class="selected-text truncate">Gemini</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500 transition-transform duration-200"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="gemini">Gemini</div>
+                                <div class="custom-dropdown-item" data-value="openai">OpenAI</div>
+                                <div class="custom-dropdown-item" data-value="claude">Claude</div>
+                            </div>
+                            <select id="api-provider" class="hidden">
+                                <option value="gemini" selected>Gemini</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="claude">Claude</option>
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label for="api-model" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiModelLabel">Model</label>
-                        <div class="relative">
-                            <select id="api-model" class="custom-select w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <!-- Models will be populated dynamically -->
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
+
+                    <!-- API Key: 2 units -->
+                    <div class="md:col-span-2">
                         <label for="api-key" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiKeyLabel">API Key</label>
                         <div class="relative">
-                            <input type="password" id="api-key" class="w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent" data-key="apiKeyPlaceholder" placeholder="Enter your API key here">
+                            <input type="password" id="api-key" class="w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pr-10 rtl:pr-2.5 rtl:pl-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent" data-key="apiKeyPlaceholder" placeholder="Enter your API key here">
                             <button id="toggle-api-key-visibility" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-sky-500 rtl:right-auto rtl:left-0">
                                 <iconify-icon icon="mdi:eye-outline" width="20" height="20"></iconify-icon>
                             </button>
                         </div>
                     </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-4">
-                    <button id="save-api-key" class="w-full md:w-auto bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="saveApiKeyBtn">Save & Activate</button>
-                    <button id="fetch-models-btn" class="w-full md:w-auto bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="fetchModelsBtn">🔄 Fetch Models</button>
+
+                    <!-- Save & Activate Button -->
+                    <div class="md:col-span-3 mt-2">
+                        <button id="save-api-key" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors" data-key="saveApiKeyBtn">Save & Activate</button>
+                    </div>
+
+                    <!-- Model Row: 3 units (Hidden until models are loaded) -->
+                    <div id="model-select-wrapper" class="md:col-span-3 hidden">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiModelLabel">Model</label>
+                        <div id="api-model-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <span class="selected-text truncate">Select model</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500 transition-transform duration-200"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu"></div>
+                            <select id="api-model" class="hidden"></select>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -188,60 +304,79 @@
                     <div id="file-preview" class="mt-4"></div>
 
                     <div class="mt-6">
-                        <label for="language-select" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="languageLabel">Content Language</label>
-                        <div class="relative">
-                            <select id="language-select" class="custom-select w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pl-3 pr-10 rtl:pr-3 rtl:pl-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <option value="auto" data-key="langAuto">Auto-detect</option>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="languageLabel">Content Language</label>
+                        <div id="language-select-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                <span class="selected-text truncate" data-key="langAuto">Auto-detect</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500 transition-transform duration-200"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="auto" data-key="langAuto">Auto-detect</div>
+                                <div class="custom-dropdown-item" data-value="fa" data-key="langFa">Persian</div>
+                                <div class="custom-dropdown-item" data-value="en" data-key="langEn">English</div>
+                                <div class="custom-dropdown-item" data-value="ar" data-key="langAr">Arabic</div>
+                                <div class="custom-dropdown-item" data-value="es" data-key="langEs">Spanish</div>
+                                <div class="custom-dropdown-item" data-value="fr" data-key="langFr">French</div>
+                            </div>
+                            <select id="language-select" class="hidden">
+                                <option value="auto" selected data-key="langAuto">Auto-detect</option>
                                 <option value="fa" data-key="langFa">Persian</option>
                                 <option value="en" data-key="langEn">English</option>
                                 <option value="ar" data-key="langAr">Arabic</option>
                                 <option value="es" data-key="langEs">Spanish</option>
                                 <option value="fr" data-key="langFr">French</option>
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
                         </div>
-                    </div>
-
-                    <!-- Progress Status Area -->
-                    <div id="upload-progress-container" class="mt-4 hidden">
-                        <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
-                            <div id="upload-progress-bar" class="bg-sky-500 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
-                        </div>
-                        <p id="upload-progress-text" class="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center font-medium"></p>
                     </div>
 
                     <button id="convert-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
-                        <iconify-icon id="convert-icon" icon="mdi:refresh"></iconify-icon>
+                        <iconify-icon id="convert-icon" icon="mdi:refresh" class="hidden"></iconify-icon>
                         <span id="convert-btn-text" data-key="convertBtn">Convert to Text</span>
                     </button>
                 </section>
 
                 <!-- Result Section -->
                 <section id="result" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 mt-8">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                         <h2 class="text-2xl font-bold text-slate-800 dark:text-white" data-key="resultTitle">3. Result</h2>
-                        <div class="flex items-center gap-2">
-                            <button id="history-modal-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="historyBtnTooltip" title="History">
-                                <iconify-icon icon="mdi:history" width="22" height="22"></iconify-icon>
+                        <!-- Action Box for Control Buttons -->
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                            <button id="result-align-left-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Left Align">
+                                <iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="restore-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="restoreBtnTooltip" title="Restore last result">
-                                <iconify-icon icon="mdi:restore" width="22" height="22"></iconify-icon>
+                            <button id="result-align-center-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Center Align">
+                                <iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
+                            <button id="result-align-right-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Right Align">
+                                <iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="history-modal-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="historyBtnTooltip" title="History">
+                                <iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="restore-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="restoreBtnTooltip" title="Restore last result">
+                                <iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="clear-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors flex items-center justify-center" data-key="clearBtnTooltip" title="Clear result">
+                                <iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="copy-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="copyBtnTooltip" title="Copy text">
+                                <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
                             </button>
                         </div>
                     </div>
                     <div id="output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
                         <p id="output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="outputPlaceholder">converted text will appear here</p>
-                        <div id="loader" class="flex flex-col items-center justify-center gap-2 hidden">
-                            <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
-                            <span id="result-loader-text" class="text-xs text-slate-500 dark:text-slate-400 font-semibold"></span>
+                        <div id="loader" class="flex flex-col items-center justify-center gap-3 hidden">
+                            <!-- Circular SVG for Dynamic Progress -->
+                            <div class="relative w-16 h-16 flex items-center justify-center">
+                                <svg id="progress-svg" class="w-full h-full transform -rotate-90 hidden" viewBox="0 0 36 36">
+                                    <path class="text-slate-300 dark:text-slate-600" stroke-width="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path id="progress-circle-path" class="text-sky-500" stroke-width="3.8" stroke-dasharray="0, 100" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                </svg>
+                                <iconify-icon id="infinite-spinner" icon="mdi:loading" class="animate-spin text-sky-500 absolute" width="50" height="50" dir="ltr"></iconify-icon>
+                            </div>
+                            <span id="result-loader-text" class="text-xs text-slate-500 dark:text-slate-400 font-semibold text-center"></span>
                         </div>
                         <textarea id="output-text-area" class="min-h-[200px] hidden"></textarea>
                     </div>
@@ -256,11 +391,11 @@
                         <div class="flex items-center gap-4">
                             <div class="flex items-center">
                                 <input id="source-result" name="translate-source" type="radio" checked class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 focus:ring-sky-500 dark:focus:ring-sky-600">
-                                <label for="source-result" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="sourceResultLabel">From Result Box</label>
+                                <label for="source-result" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceResultLabel">From Result Box</label>
                             </div>
                             <div class="flex items-center">
                                 <input id="source-manual" name="translate-source" type="radio" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 focus:ring-sky-500 dark:focus:ring-sky-600">
-                                <label for="source-manual" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="sourceManualLabel">Manual Input</label>
+                                <label for="source-manual" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceManualLabel">Manual Input</label>
                             </div>
                         </div>
                     </div>
@@ -268,12 +403,12 @@
                     <div id="translate-input-container-wrapper" class="hidden mb-4">
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translationHistoryInput">Input</h3>
-                            <div class="flex items-center gap-2">
-                                <button id="translate-input-clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                    <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
+                            <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                                <button id="translate-input-clear-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors flex items-center justify-center" data-key="clearBtnTooltip" title="Clear result">
+                                    <iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon>
                                 </button>
-                                <button id="translate-input-copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                    <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
+                                <button id="translate-input-copy-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="copyBtnTooltip" title="Copy text">
+                                    <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
                                 </button>
                             </div>
                         </div>
@@ -284,53 +419,89 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                         <div>
-                            <label for="translate-language-select" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateLangLabel">Translate to</label>
-                            <div class="relative">
-                                <select id="translate-language-select" class="custom-select w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pl-3 pr-10 rtl:pr-3 rtl:pl-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                    <option value="fa" data-key="langFa">Persian</option>
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateModeLabel">Action Mode</label>
+                            <div id="translate-mode-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                    <span class="selected-text truncate" data-key="modeBoth">Translate & Format</span>
+                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500 transition-transform duration-200"></iconify-icon>
+                                </div>
+                                <div class="custom-dropdown-menu">
+                                    <div class="custom-dropdown-item selected" data-value="both" data-key="modeBoth">Translate & Format</div>
+                                    <div class="custom-dropdown-item" data-value="translate" data-key="modeTranslateOnly">Translate Only</div>
+                                    <div class="custom-dropdown-item" data-value="format" data-key="modeFormatOnly">Format Only</div>
+                                </div>
+                                <select id="translate-mode-select" class="hidden">
+                                    <option value="both" selected data-key="modeBoth">Translate & Format</option>
+                                    <option value="translate" data-key="modeTranslateOnly">Translate Only</option>
+                                    <option value="format" data-key="modeFormatOnly">Format Only</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="target-lang-wrapper">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateLangLabel">Translate to</label>
+                            <div id="translate-language-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                    <span class="selected-text truncate" data-key="langFa">Persian</span>
+                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500 transition-transform duration-200"></iconify-icon>
+                                </div>
+                                <div class="custom-dropdown-menu">
+                                    <div class="custom-dropdown-item selected" data-value="fa" data-key="langFa">Persian</div>
+                                    <div class="custom-dropdown-item" data-value="en" data-key="langEn">English</div>
+                                    <div class="custom-dropdown-item" data-value="ar" data-key="langAr">Arabic</div>
+                                    <div class="custom-dropdown-item" data-value="es" data-key="langEs">Spanish</div>
+                                    <div class="custom-dropdown-item" data-value="fr" data-key="langFr">French</div>
+                                </div>
+                                <select id="translate-language-select" class="hidden">
+                                    <option value="fa" selected data-key="langFa">Persian</option>
                                     <option value="en" data-key="langEn">English</option>
                                     <option value="ar" data-key="langAr">Arabic</option>
                                     <option value="es" data-key="langEs">Spanish</option>
                                     <option value="fr" data-key="langFr">French</option>
                                 </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                                </div>
                             </div>
                         </div>
-                        <div class="flex items-center pt-6">
-                            <input id="format-checkbox" type="checkbox" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 rounded focus:ring-sky-500 dark:focus:ring-sky-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                            <label for="format-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="formatCheckboxLabel">Format & structure the text</label>
-                        </div>
                     </div>
-                    <button id="translate-btn" class="mt-6 w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
+
+                    <button id="translate-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
                         <iconify-icon id="translate-icon" icon="mdi:translate"></iconify-icon>
-                        <span id="translate-btn-text" data-key="translateBtn">Translate</span>
+                        <span id="translate-btn-text" data-key="translateBtn">Process</span>
                     </button>
 
-                    <div class="flex justify-between items-center my-4">
-                        <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translateOutputTitle">Translated Text</h3>
-                        <div class="flex items-center gap-2">
-                            <button id="translate-history-modal-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="historyBtnTooltip" title="History">
-                                <iconify-icon icon="mdi:history" width="22" height="22"></iconify-icon>
+                    <div class="flex justify-between items-center my-4 flex-wrap gap-2">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translateOutputTitle">Processed Text</h3>
+                        <!-- Action Box for Control Buttons -->
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                            <button id="translate-align-left-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Left Align">
+                                <iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="translate-restore-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="restoreBtnTooltip" title="Restore last result">
-                                <iconify-icon icon="mdi:restore" width="22" height="22"></iconify-icon>
+                            <button id="translate-align-center-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Center Align">
+                                <iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="translate-clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
+                            <button id="translate-align-right-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" title="Right Align">
+                                <iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon>
                             </button>
-                            <button id="translate-copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="translate-history-modal-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="historyBtnTooltip" title="History">
+                                <iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="translate-restore-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="restoreBtnTooltip" title="Restore last result">
+                                <iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="translate-clear-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors flex items-center justify-center" data-key="clearBtnTooltip" title="Clear result">
+                                <iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon>
+                            </button>
+                            <button id="translate-copy-btn" class="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors flex items-center justify-center" data-key="copyBtnTooltip" title="Copy text">
+                                <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
                             </button>
                         </div>
                     </div>
-                    <div id="translate-output-container" class="w-full min-h-[150px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-700 dark:text-slate-200 whitespace-pre-wrap flex items-center justify-center">
-                        <p id="translate-output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="translateOutputPlaceholder">translation will appear here</p>
-                        <div id="translate-loader" class="flex hidden">
-                            <iconify-icon icon="mdi:loading" class="animate-spin text-teal-500" width="50" height="50" dir="ltr"></iconify-icon>
+
+                    <div id="translate-output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
+                        <p id="translate-output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="translateOutputPlaceholder">result will appear here</p>
+                        <div id="translate-loader" class="flex flex-col items-center justify-center gap-3 hidden">
+                            <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
                         </div>
-                        <textarea id="translate-output-area" class="min-h-[120px] hidden"></textarea>
+                        <textarea id="translate-output-area" class="min-h-[200px] hidden"></textarea>
                     </div>
                 </section>
             </div>
@@ -338,22 +509,27 @@
 
         <!-- Control Buttons -->
         <div class="fixed bottom-4 left-4 z-20 flex flex-col gap-3" dir="ltr">
-            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden">
-                <button id="lang-en" class="px-3 py-2 text-sm font-semibold">EN</button>
-                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold">FA</button>
+            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                <button id="lang-en" class="px-3 py-2 text-sm font-semibold transition-colors">EN</button>
+                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold transition-colors">FA</button>
             </div>
-            <button id="theme-toggle-btn" class="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Toggle theme">
+            <button id="theme-toggle-btn" class="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700" aria-label="Toggle theme">
                 <iconify-icon icon="mdi:weather-night" class="text-slate-500 dark:hidden" width="24" height="24"></iconify-icon>
                 <iconify-icon icon="mdi:white-balance-sunny" class="text-slate-500 hidden dark:inline" width="24" height="24"></iconify-icon>
             </button>
         </div>
 
-        <!-- Message Modal -->
+        <!-- Dynamic Message Modal -->
         <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-md w-full text-center flex flex-col max-h-[85vh]">
                 <h3 id="modal-title" class="text-xl font-bold mb-4">Message</h3>
-                <p id="modal-message" class="text-slate-600 dark:text-slate-300 mb-6"></p>
-                <button id="modal-close-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="modalCloseBtn">OK</button>
+                <div id="modal-msg-container" class="relative bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-left rtl:text-right overflow-y-auto max-h-[300px] my-2 group">
+                    <button id="modal-copy-btn" class="absolute top-2 right-2 rtl:right-auto rtl:left-2 p-1.5 text-slate-500 hover:text-sky-500 bg-white dark:bg-slate-800 rounded shadow transition-colors" title="Copy Error text">
+                        <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
+                    </button>
+                    <p id="modal-message" class="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap break-words pr-8 rtl:pr-0 rtl:pl-8"></p>
+                </div>
+                <button id="modal-close-btn" class="mt-4 bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors self-center" data-key="modalCloseBtn">OK</button>
             </div>
         </div>
 
@@ -390,23 +566,128 @@
         </div>
 
         <!-- Toast Notification -->
-        <div id="toast-notification" class="fixed bottom-4 right-4 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg hidden flex items-center gap-2">
+        <div id="toast-notification" class="fixed bottom-4 right-4 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg hidden flex items-center gap-2 z-50">
             <span id="toast-icon"></span>
             <p id="toast-message"></p>
         </div>
 
     </div>
 
+    <footer class="mt-12 py-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400" dir="ltr">
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+            <span>© 2026 Content-to-Text Converter</span>
+            <span>•</span>
+            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 dark:hover:text-sky-400 transition-colors font-medium">
+                <iconify-icon icon="mdi:github" width="18" height="18"></iconify-icon>
+                GitHub
+            </a>
+            <span>•</span>
+            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 dark:hover:text-sky-400 transition-colors font-medium">
+                <iconify-icon icon="mdi:license" width="16" height="16"></iconify-icon>
+                License (MIT)
+            </a>
+        </div>
+    </footer>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Custom Dropdown Manager ---
+            function initCustomDropdown(dropdownId, onSelectCallback) {
+                const container = document.getElementById(dropdownId);
+                if (!container) return;
+                const trigger = container.querySelector('.custom-dropdown-trigger');
+                const menu = container.querySelector('.custom-dropdown-menu');
+                const select = container.querySelector('select');
+                const selectedTextSpan = trigger.querySelector('.selected-text');
+                const chevron = trigger.querySelector('iconify-icon');
+
+                trigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Close all other dropdowns
+                    document.querySelectorAll('.custom-dropdown').forEach(d => {
+                        if (d !== container) d.classList.remove('open');
+                    });
+                    const isOpen = container.classList.toggle('open');
+                    if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+                });
+
+                menu.addEventListener('click', (e) => {
+                    const item = e.target.closest('.custom-dropdown-item');
+                    if (!item) return;
+                    const value = item.getAttribute('data-value');
+                    const text = item.textContent;
+
+                    // Update UI selection state
+                    menu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+
+                    selectedTextSpan.textContent = text;
+                    if (item.hasAttribute('data-key')) {
+                        selectedTextSpan.setAttribute('data-key', item.getAttribute('data-key'));
+                    } else {
+                        selectedTextSpan.removeAttribute('data-key');
+                    }
+
+                    container.classList.remove('open');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+
+                    // Sync with native select
+                    if (select) {
+                        select.value = value;
+                        select.dispatchEvent(new Event('change'));
+                    }
+
+                    if (onSelectCallback) onSelectCallback(value, text);
+                });
+
+                // External click to close
+                document.addEventListener('click', () => {
+                    container.classList.remove('open');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+                });
+            }
+
+            // Helper to programmatically update custom dropdown value
+            function setCustomDropdownValue(dropdownId, value, text) {
+                const container = document.getElementById(dropdownId);
+                if (!container) return;
+                const menu = container.querySelector('.custom-dropdown-menu');
+                const selectedTextSpan = container.querySelector('.selected-text');
+                const select = container.querySelector('select');
+
+                let targetItem = null;
+                menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                    if (item.getAttribute('data-value') === value) {
+                        item.classList.add('selected');
+                        targetItem = item;
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+
+                if (targetItem) {
+                    selectedTextSpan.textContent = targetItem.textContent;
+                    if (targetItem.hasAttribute('data-key')) {
+                        selectedTextSpan.setAttribute('data-key', targetItem.getAttribute('data-key'));
+                    } else {
+                        selectedTextSpan.removeAttribute('data-key');
+                    }
+                } else if (text) {
+                    selectedTextSpan.textContent = text;
+                    selectedTextSpan.removeAttribute('data-key');
+                }
+
+                if (select) select.value = value;
+            }
+
             // --- DOM Selectors ---
             const dom = {
                 html: document.documentElement,
                 apiKeyInput: document.getElementById('api-key'),
                 apiProviderSelect: document.getElementById('api-provider'),
                 apiModelSelect: document.getElementById('api-model'),
+                modelSelectWrapper: document.getElementById('model-select-wrapper'),
                 saveApiKeyBtn: document.getElementById('save-api-key'),
-                fetchModelsBtn: document.getElementById('fetch-models-btn'),
                 mainAppWrapper: document.getElementById('main-app-wrapper'),
                 dropZone: document.getElementById('drop-zone'),
                 fileInput: document.getElementById('file-input'),
@@ -424,7 +705,9 @@
                 messageModal: document.getElementById('message-modal'),
                 modalTitle: document.getElementById('modal-title'),
                 modalMessage: document.getElementById('modal-message'),
+                modalMsgContainer: document.getElementById('modal-msg-container'),
                 modalCloseBtn: document.getElementById('modal-close-btn'),
+                modalCopyBtn: document.getElementById('modal-copy-btn'),
                 resetAppBtn: document.getElementById('reset-app-btn'),
                 resetModal: document.getElementById('reset-modal'),
                 resetConfirmBtn: document.getElementById('reset-confirm-btn'),
@@ -444,13 +727,14 @@
                 toastMessage: document.getElementById('toast-message'),
                 loader: document.getElementById('loader'),
                 resultLoaderText: document.getElementById('result-loader-text'),
-                uploadProgressContainer: document.getElementById('upload-progress-container'),
-                uploadProgressBar: document.getElementById('upload-progress-bar'),
-                uploadProgressText: document.getElementById('upload-progress-text'),
+                progressSvg: document.getElementById('progress-svg'),
+                progressCirclePath: document.getElementById('progress-circle-path'),
+                infiniteSpinner: document.getElementById('infinite-spinner'),
                 translateBtn: document.getElementById('translate-btn'),
                 translateIcon: document.getElementById('translate-icon'),
+                translateModeSelect: document.getElementById('translate-mode-select'),
+                targetLangWrapper: document.getElementById('target-lang-wrapper'),
                 translateLangSelect: document.getElementById('translate-language-select'),
-                formatCheckbox: document.getElementById('format-checkbox'),
                 translateInputContainerWrapper: document.getElementById('translate-input-container-wrapper'),
                 translateInputContainer: document.getElementById('translate-input-container'),
                 translateInputArea: document.getElementById('translate-input-area'),
@@ -465,12 +749,18 @@
                 translateInputCopyBtn: document.getElementById('translate-input-copy-btn'),
                 translateInputClearBtn: document.getElementById('translate-input-clear-btn'),
                 toggleApiKeyVisibilityBtn: document.getElementById('toggle-api-key-visibility'),
+                resultAlignLeftBtn: document.getElementById('result-align-left-btn'),
+                resultAlignCenterBtn: document.getElementById('result-align-center-btn'),
+                resultAlignRightBtn: document.getElementById('result-align-right-btn'),
+                translateAlignLeftBtn: document.getElementById('translate-align-left-btn'),
+                translateAlignCenterBtn: document.getElementById('translate-align-center-btn'),
+                translateAlignRightBtn: document.getElementById('translate-align-right-btn'),
             };
 
             // --- State Variables ---
             let selectedFile = null;
-            let lastResult = '';
-            let lastTranslation = {};
+            let lastResult = localStorage.getItem('lastResult') || '';
+            let lastTranslation = JSON.parse(localStorage.getItem('lastTranslation') || '{}');
             let toastTimeout;
             let currentLang = 'en';
             let transcriptionHistory = [];
@@ -488,7 +778,6 @@
                     apiKeyLabel: "API Key",
                     apiKeyPlaceholder: "Enter your API key here",
                     saveApiKeyBtn: "Save & Activate",
-                    fetchModelsBtn: "🔄 Fetch Models",
                     uploadTitle: "2. Upload & Convert",
                     dropZoneClick: "Click to upload",
                     dropZoneOr: " or drag and drop",
@@ -511,15 +800,18 @@
                     modalCloseBtn: "OK",
                     removeFileBtn: "Remove",
                     translateTitle: "4. Translate & Format",
-                    translateOutputTitle: "Translated Text",
+                    translateOutputTitle: "Processed Text",
+                    translateModeLabel: "Action Mode",
+                    modeBoth: "Translate & Format",
+                    modeTranslateOnly: "Translate Only",
+                    modeFormatOnly: "Format Only",
                     translateLangLabel: "Translate to",
-                    formatCheckboxLabel: "Format & structure the text",
-                    translateBtn: "Translate",
+                    translateBtn: "Process",
                     translateSourceLabel: "Input Source",
                     sourceResultLabel: "From Result Box",
                     sourceManualLabel: "Manual Input",
-                    translateInputPlaceholder: "Enter text to translate",
-                    translateOutputPlaceholder: "translation will appear here",
+                    translateInputPlaceholder: "Enter text to process",
+                    translateOutputPlaceholder: "result will appear here",
                     historyModalTitle: "Transcription History",
                     translateHistoryModalTitle: "Translation History",
                     historyFileNameLabel: "Source File:",
@@ -535,7 +827,7 @@
                     msgApiKeyError: "Please enter a valid API key.",
                     msgInvalidApiKeyError: "The API key is invalid or has expired. Please check it and try again.",
                     msgNoFile: "Please select a file first.",
-                    msgNoTextToTranslate: "There is no text to translate.",
+                    msgNoTextToTranslate: "There is no text to process.",
                     msgCopySuccess: "Copied to clipboard!",
                     msgCopyNoText: "No text to copy!",
                     msgResultCleared: "Result cleared.",
@@ -547,7 +839,7 @@
                     msgErrorTitle: "Error",
                     msgAttentionTitle: "Attention",
                     msgConverting: "Converting...",
-                    msgTranslating: "Translating...",
+                    msgTranslating: "Processing...",
                     msgSelectedFile: "Selected file:",
                     msgClaudeAudioUnsupported: "Claude API does not support audio/video transcription. Please select an image file or choose another provider.",
                     msgUnknownError: "An unknown error occurred. Please try again.",
@@ -560,7 +852,7 @@
                     msgFetchingModels: "Fetching models...",
                     msgCopyError: "Failed to copy text.",
                     msgUploading: (percent, uploaded, total, speed) => `Uploading: ${percent}% (${uploaded} / ${total} MB) - Speed: ${speed} MB/s`,
-                    msgProcessingModel: "Uploading finished! Processing file with AI model...",
+                    msgProcessingModel: "Uploading finished! Processing file with AI model..."
                 },
                 fa: {
                     pageTitle: "تبدیل محتوا به متن",
@@ -572,7 +864,6 @@
                     apiKeyLabel: "کلید API",
                     apiKeyPlaceholder: "کلید API خود را اینجا وارد کنید",
                     saveApiKeyBtn: "ذخیره و فعال‌سازی",
-                    fetchModelsBtn: "🔄 دریافت مدل‌ها",
                     uploadTitle: "۲. آپلود و تبدیل",
                     dropZoneClick: "برای آپلود کلیک کنید",
                     dropZoneOr: " یا فایل را بکشید و رها کنید",
@@ -595,15 +886,18 @@
                     modalCloseBtn: "باشه",
                     removeFileBtn: "حذف",
                     translateTitle: "۴. ترجمه و قالب‌بندی",
-                    translateOutputTitle: "متن ترجمه شده",
+                    translateOutputTitle: "متن پردازش شده",
+                    translateModeLabel: "حالت عملکرد",
+                    modeBoth: "ترجمه و قالب‌بندی",
+                    modeTranslateOnly: "فقط ترجمه",
+                    modeFormatOnly: "فقط قالب‌بندی",
                     translateLangLabel: "ترجمه به",
-                    formatCheckboxLabel: "مرتب‌سازی و ساختاربندی متن",
-                    translateBtn: "ترجمه",
+                    translateBtn: "پردازش",
                     translateSourceLabel: "منبع ورودی",
                     sourceResultLabel: "از کادر نتیجه",
                     sourceManualLabel: "ورودی دستی",
-                    translateInputPlaceholder: "متن برای ترجمه را اینجا وارد کنید",
-                    translateOutputPlaceholder: "ترجمه در اینجا نمایش داده می‌شود",
+                    translateInputPlaceholder: "متن برای پردازش را اینجا وارد کنید",
+                    translateOutputPlaceholder: "نتیجه در اینجا نمایش داده می‌شود",
                     historyModalTitle: "تاریخچه تبدیل‌ها",
                     translateHistoryModalTitle: "تاریخچه ترجمه‌ها",
                     historyFileNameLabel: "فایل منبع:",
@@ -619,7 +913,7 @@
                     msgApiKeyError: "لطفاً کلید API را وارد کنید.",
                     msgInvalidApiKeyError: "کلید API نامعتبر است یا منقضی شده. لطفاً آن را بررسی کرده و دوباره تلاش کنید.",
                     msgNoFile: "لطفاً ابتدا یک فایل را انتخاب کنید.",
-                    msgNoTextToTranslate: "متنی برای ترجمه وجود ندارد.",
+                    msgNoTextToTranslate: "متنی برای پردازش وجود ندارد.",
                     msgCopySuccess: "در کلیپ‌بورد کپی شد!",
                     msgCopyNoText: "متنی برای کپی کردن وجود ندارد",
                     msgResultCleared: "نتیجه پاک شد.",
@@ -631,7 +925,7 @@
                     msgErrorTitle: "خطا",
                     msgAttentionTitle: "توجه",
                     msgConverting: "در حال تبدیل...",
-                    msgTranslating: "در حال ترجمه...",
+                    msgTranslating: "در حال پردازش...",
                     msgSelectedFile: "فایل انتخاب‌شده:",
                     msgClaudeAudioUnsupported: "API کلاد از تبدیل صوت/ویدیو پشتیبانی نمی‌کند. لطفاً یک فایل تصویر انتخاب کنید یا سرویس‌دهنده دیگری را امتحان کنید.",
                     msgUnknownError: "خطایی ناشناخته رخ داد. لطفاً دوباره تلاش کنید.",
@@ -644,11 +938,9 @@
                     msgFetchingModels: "در حال دریافت مدل‌ها...",
                     msgCopyError: "کپی کردن متن با خطا مواجه شد.",
                     msgUploading: (percent, uploaded, total, speed) => `در حال آپلود: ${percent}% (${uploaded} از ${total} مگابایت) - سرعت: ${speed} MB/s`,
-                    msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است...",
+                    msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است..."
                 }
             };
-
-            // --- Function Definitions ---
 
             function setLanguage(lang) {
                 currentLang = lang;
@@ -676,7 +968,7 @@
             }
 
             function showMessage(titleKey, messageKeyOrText, isError = true, messageArgs, isRawText = false) {
-                const title = translations[currentLang][titleKey];
+                const title = translations[currentLang][titleKey] || titleKey;
                 let message;
                 if (isRawText) {
                     message = messageKeyOrText;
@@ -690,6 +982,18 @@
                 dom.modalTitle.classList.toggle('text-red-500', isError);
                 dom.modalTitle.classList.toggle('text-slate-800', !isError);
                 dom.modalTitle.classList.toggle('dark:text-white', !isError);
+
+                const wordCount = message.trim().split(/\s+/).length;
+                if (wordCount > 20) {
+                    dom.modalMsgContainer.className = "relative bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-left rtl:text-right overflow-y-auto max-h-[300px] my-2 group";
+                    dom.modalCopyBtn.classList.remove('hidden');
+                    dom.modalMessage.className = "text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap break-words pr-8 rtl:pr-0 rtl:pl-8";
+                } else {
+                    dom.modalMsgContainer.className = "my-4 text-center";
+                    dom.modalCopyBtn.classList.add('hidden');
+                    dom.modalMessage.className = "text-slate-600 dark:text-slate-300 text-base font-medium break-words";
+                }
+
                 dom.messageModal.classList.remove('hidden');
             }
 
@@ -706,11 +1010,9 @@
             function checkApiKey() {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiProvider = localStorage.getItem('apiProvider');
-                const apiModel = localStorage.getItem('apiModel');
                 if (apiKey && apiProvider) {
                     dom.apiKeyInput.value = apiKey;
-                    dom.apiProviderSelect.value = apiProvider;
-                    dom.mainAppWrapper.classList.remove('disabled-section');
+                    setCustomDropdownValue('api-provider-dropdown', apiProvider);
                 }
             }
 
@@ -718,11 +1020,15 @@
                 selectedFile = null;
                 dom.fileInput.value = '';
                 dom.filePreview.innerHTML = '';
+                dom.dropZone.classList.remove('hidden');
             }
 
             function handleFile(file) {
                 resetUpload();
                 selectedFile = file;
+
+                dom.dropZone.classList.add('hidden');
+
                 const fileType = file.type.split('/')[0];
                 let previewElement;
                 if (fileType === 'image') {
@@ -771,13 +1077,31 @@
                         return currentLang === 'fa' ? `محتوای فایل زیر را آوانویسی کن. فرض کن زبان محتوا ${languageName} است. ترجمه نکن، فقط هرچه میشنوی یا میبینی را به زبان ${languageName} بنویس.` : `Transcribe the content of the file below. Assume the language is ${languageName}. Do not translate; only write what you hear or see in the ${languageName} language.`;
                     }
                 } else if (task === 'translate') {
-                    const targetLanguage = dom.translateLangSelect.options[dom.translateLangSelect.selectedIndex].text;
-                    const formatText = dom.formatCheckbox.checked ? (currentLang === 'fa' ? " متن را مرتب و پاراگراف بندی کن." : " Format and structure the text with proper paragraphing.") : "";
-                    return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن.${formatText}` : `Translate the following text to ${targetLanguage}.${formatText}`);
+                    const mode = dom.translateModeSelect.value;
+                    const targetLanguage = document.querySelector(`#translate-language-select option[value="${dom.translateLangSelect.value}"]`)?.textContent || "Persian";
+
+                    if (mode === 'both') {
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن و متن را کاملاً مرتب، پاراگراف‌بندی و ساختاربندی کن.` : `Translate the following text to ${targetLanguage} and format/structure the text with proper paragraphing.`);
+                    } else if (mode === 'translate') {
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن. ساختار اصلی متن را تغییر نده.` : `Translate the following text to ${targetLanguage}. Keep the original structure as is.`);
+                    } else if (mode === 'format') {
+                        return (currentLang === 'fa' ? `متن زیر را فقط مرتب، ویرایش و پاراگراف‌بندی کن. زبان متن را تغییر نده.` : `Format, clean up, and structure the following text into proper paragraphs. Do not change the language.`);
+                    }
                 }
             }
 
-            // XHR Wrapper to accurately track upload progress over network
+            function updateProcessButtonIcon() {
+                const mode = dom.translateModeSelect.value;
+                const iconElem = dom.translateIcon;
+                if (mode === 'both') {
+                    iconElem.setAttribute('icon', 'mdi:translate');
+                } else if (mode === 'translate') {
+                    iconElem.setAttribute('icon', 'mdi:earth');
+                } else if (mode === 'format') {
+                    iconElem.setAttribute('icon', 'mdi:format-align-left');
+                }
+            }
+
             function xhrRequest({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
                 return new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
@@ -788,20 +1112,13 @@
                     });
 
                     let startTime = Date.now();
-                    let lastLoaded = 0;
 
                     if (xhr.upload && onUploadProgress) {
                         xhr.upload.onprogress = (e) => {
                             if (e.lengthComputable) {
                                 const now = Date.now();
-                                const timeDiff = (now - startTime) / 1000; // in seconds
-                                const loadedDiff = e.loaded - lastLoaded;
-
-                                let speedMBps = 0;
-                                if (timeDiff > 0) {
-                                    speedMBps = ((e.loaded / (1024 * 1024)) / timeDiff).toFixed(2);
-                                }
-
+                                const timeDiff = (now - startTime) / 1000;
+                                const speedMBps = timeDiff > 0 ? ((e.loaded / (1024 * 1024)) / timeDiff).toFixed(2) : 0;
                                 const percent = Math.round((e.loaded / e.total) * 100);
                                 const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
                                 const totalMB = (e.total / (1024 * 1024)).toFixed(2);
@@ -892,27 +1209,44 @@
                 }
             }
 
-            function populateModelSelect(models, selectedModel = null, emptyMessageKey = 'msgNoModelsFound') {
+            function populateModelSelect(models, selectedModel = null) {
                 const modelSelect = dom.apiModelSelect;
+                const modelMenu = document.querySelector('#api-model-dropdown .custom-dropdown-menu');
                 modelSelect.innerHTML = '';
+                modelMenu.innerHTML = '';
 
                 if (!models || models.length === 0) {
-                    const option = document.createElement('option');
-                    option.value = '';
-                    option.textContent = translations[currentLang][emptyMessageKey];
-                    modelSelect.appendChild(option);
+                    dom.modelSelectWrapper.classList.add('hidden');
+                    dom.mainAppWrapper.classList.add('disabled-section');
                     return;
                 }
 
-                models.forEach(model => {
+                models.forEach((model, index) => {
                     const option = document.createElement('option');
                     option.value = model.id;
                     option.textContent = `${model.displayName}${model.description ? ` - ${model.description}` : ''}`;
-                    if (selectedModel && model.id === selectedModel) {
+
+                    const item = document.createElement('div');
+                    item.className = 'custom-dropdown-item';
+                    item.setAttribute('data-value', model.id);
+                    item.textContent = option.textContent;
+
+                    if ((selectedModel && model.id === selectedModel) || (!selectedModel && index === 0)) {
                         option.selected = true;
+                        item.classList.add('selected');
+                        document.querySelector('#api-model-dropdown .selected-text').textContent = option.textContent;
                     }
+
                     modelSelect.appendChild(option);
+                    modelMenu.appendChild(item);
                 });
+
+                if (!localStorage.getItem('apiModel') && models.length > 0) {
+                    localStorage.setItem('apiModel', models[0].id);
+                }
+
+                dom.modelSelectWrapper.classList.remove('hidden');
+                dom.mainAppWrapper.classList.remove('disabled-section');
             }
 
             async function fetchAndPopulateModels(provider, apiKey) {
@@ -924,28 +1258,29 @@
                     showToast('msgFetchModelsSuccess');
                 } catch (error) {
                     console.error('Error fetching models:', error);
-                    showMessage('msgErrorTitle', 'msgFetchModelsError');
                     populateModelSelect([]);
+                    showMessage('msgErrorTitle', 'msgFetchModelsError');
                 }
             }
 
             function updateProgressUI(info) {
-                dom.uploadProgressContainer.classList.remove('hidden');
-                dom.uploadProgressBar.style.width = `${info.percent}%`;
+                if (info.percent < 100) {
+                    dom.progressSvg.classList.remove('hidden');
+                    dom.infiniteSpinner.classList.add('hidden');
+                    dom.progressCirclePath.setAttribute('stroke-dasharray', `${info.percent}, 100`);
 
-                const progressText = translations[currentLang].msgUploading(
-                    info.percent,
-                    info.uploadedMB,
-                    info.totalMB,
-                    info.speedMBps
-                );
+                    const progressText = translations[currentLang].msgUploading(
+                        info.percent,
+                        info.uploadedMB,
+                        info.totalMB,
+                        info.speedMBps
+                    );
+                    dom.resultLoaderText.textContent = progressText;
+                } else {
+                    dom.progressSvg.classList.add('hidden');
+                    dom.infiniteSpinner.classList.remove('hidden');
 
-                dom.uploadProgressText.textContent = progressText;
-                dom.resultLoaderText.textContent = progressText;
-
-                if (info.percent >= 100) {
                     const processingText = translations[currentLang].msgProcessingModel;
-                    dom.uploadProgressText.textContent = processingText;
                     dom.resultLoaderText.textContent = processingText;
                 }
             }
@@ -1078,11 +1413,13 @@
                 btn.disabled = true;
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'msgTranslating' : 'msgConverting'];
                 if (!isTranslate) {
-                    btn.querySelector('iconify-icon').classList.add('animate-spin');
-                    dom.uploadProgressContainer.classList.remove('hidden');
-                    dom.uploadProgressBar.style.width = '0%';
-                    dom.uploadProgressText.textContent = '';
+                    dom.convertIcon.classList.remove('hidden');
+                    dom.convertIcon.classList.add('animate-spin');
+                    dom.progressSvg.classList.add('hidden');
+                    dom.infiniteSpinner.classList.remove('hidden');
                     dom.resultLoaderText.textContent = '';
+                } else {
+                    dom.translateIcon.classList.add('animate-spin');
                 }
                 placeholder.classList.add('hidden');
                 outputArea.classList.add('hidden');
@@ -1096,8 +1433,10 @@
                 btn.disabled = false;
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'translateBtn' : 'convertBtn'];
                 if (!isTranslate) {
-                    btn.querySelector('iconify-icon').classList.remove('animate-spin');
-                    dom.uploadProgressContainer.classList.add('hidden');
+                    dom.convertIcon.classList.remove('animate-spin');
+                    dom.convertIcon.classList.add('hidden');
+                } else {
+                    dom.translateIcon.classList.remove('animate-spin');
                 }
                 loader.classList.add('hidden');
                 outputArea.classList.remove('hidden');
@@ -1232,13 +1571,6 @@
                     const inputSection = createSection('translationHistoryInput', item.input);
                     const outputSection = createSection('translationHistoryOutput', item.output);
 
-                    if (item.formatted) {
-                        const formattedBadge = document.createElement('span');
-                        formattedBadge.className = 'text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300 px-2 py-0.5 rounded-full';
-                        formattedBadge.textContent = translations[currentLang].translationHistoryFormatted;
-                        inputSection.querySelector('h4').appendChild(formattedBadge);
-                    }
-
                     itemDiv.appendChild(mainControls);
                     itemDiv.appendChild(inputSection);
                     itemDiv.appendChild(outputSection);
@@ -1253,6 +1585,27 @@
                 setLanguage(savedLang);
                 checkApiKey();
                 loadHistory();
+                updateProcessButtonIcon();
+
+                // Initialize all custom dropdowns
+                initCustomDropdown('api-provider-dropdown', (value) => {
+                    const apiKey = localStorage.getItem('apiKey');
+                    if (apiKey) fetchAndPopulateModels(value, apiKey);
+                    else populateModelSelect([]);
+                });
+                initCustomDropdown('api-model-dropdown', (value) => {
+                    if (value) localStorage.setItem('apiModel', value);
+                });
+                initCustomDropdown('language-select-dropdown');
+                initCustomDropdown('translate-mode-dropdown', (value) => {
+                    updateProcessButtonIcon();
+                    if (value === 'format') {
+                        dom.targetLangWrapper.classList.add('hidden');
+                    } else {
+                        dom.targetLangWrapper.classList.remove('hidden');
+                    }
+                });
+                initCustomDropdown('translate-language-dropdown');
 
                 const savedProvider = localStorage.getItem('apiProvider');
                 const savedApiKey = localStorage.getItem('apiKey');
@@ -1260,48 +1613,22 @@
                 if (savedApiKey && savedProvider) {
                     fetchAndPopulateModels(savedProvider, savedApiKey);
                 } else {
-                    populateModelSelect([], null, 'msgNoModelsYet');
+                    populateModelSelect([]);
                 }
 
                 dom.saveApiKeyBtn.addEventListener('click', () => {
                     const apiKey = dom.apiKeyInput.value.trim();
                     const apiProvider = dom.apiProviderSelect.value;
-                    const apiModel = dom.apiModelSelect.value;
 
                     if (apiKey) {
                         localStorage.setItem('apiKey', apiKey);
                         localStorage.setItem('apiProvider', apiProvider);
-                        if (apiModel) {
-                            localStorage.setItem('apiModel', apiModel);
-                        }
-                        dom.mainAppWrapper.classList.remove('disabled-section');
                         showToast('msgApiKeySuccess');
-
                         fetchAndPopulateModels(apiProvider, apiKey);
                     } else {
+                        localStorage.removeItem('apiKey');
+                        populateModelSelect([]);
                         showMessage('msgErrorTitle', 'msgApiKeyError');
-                    }
-                });
-
-                dom.fetchModelsBtn.addEventListener('click', async () => {
-                    const apiKey = dom.apiKeyInput.value.trim() || localStorage.getItem('apiKey');
-                    const provider = dom.apiProviderSelect.value;
-
-                    if (!apiKey) {
-                        showMessage('msgErrorTitle', 'msgApiKeyError');
-                        return;
-                    }
-
-                    await fetchAndPopulateModels(provider, apiKey);
-                });
-
-                dom.apiProviderSelect.addEventListener('change', () => {
-                    const apiKey = localStorage.getItem('apiKey');
-                    const provider = dom.apiProviderSelect.value;
-                    if (apiKey) {
-                        fetchAndPopulateModels(provider, apiKey);
-                    } else {
-                        populateModelSelect([], null, 'msgNoModelsYet');
                     }
                 });
 
@@ -1333,6 +1660,7 @@
                         }
                         dom.outputText.value = result;
                         lastResult = result;
+                        localStorage.setItem('lastResult', result);
                         transcriptionHistory.unshift({ fileName: selectedFile.name, text: result });
                         saveHistory('transcription');
                     } catch (error) {
@@ -1359,7 +1687,8 @@
                     try {
                         const result = await callGenericAPI(getPrompt('translate'), source);
                         dom.translateOutputArea.value = result;
-                        lastTranslation = { input: source, output: result, formatted: dom.formatCheckbox.checked };
+                        lastTranslation = { input: source, output: result, mode: dom.translateModeSelect.value };
+                        localStorage.setItem('lastTranslation', JSON.stringify(lastTranslation));
                         translationHistory.unshift(lastTranslation);
                         saveHistory('translation');
                     } catch (error) {
@@ -1380,12 +1709,12 @@
                 dom.sourceManualRadio.addEventListener('change', () => dom.translateInputContainerWrapper.classList.remove('hidden'));
 
                 dom.restoreBtn.addEventListener('click', () => {
-                    dom.outputText.value = lastResult;
                     if (lastResult) {
+                        dom.outputText.value = lastResult;
                         dom.outputPlaceholder.classList.add('hidden');
                         dom.outputText.classList.remove('hidden');
+                        showToast('msgHistoryRestored', false);
                     }
-                    showToast('msgHistoryRestored', false);
                 });
 
                 dom.clearBtn.addEventListener('click', () => {
@@ -1409,11 +1738,37 @@
                     if (lastTranslation.output) {
                         dom.translateOutputArea.value = lastTranslation.output;
                         dom.translateInputArea.value = lastTranslation.input;
-                        dom.formatCheckbox.checked = lastTranslation.formatted;
+                        setCustomDropdownValue('translate-mode-dropdown', lastTranslation.mode || 'both');
+                        dom.translateModeSelect.value = lastTranslation.mode || 'both';
+                        dom.translateModeSelect.dispatchEvent(new Event('change'));
                         dom.translateOutputPlaceholder.classList.add('hidden');
                         dom.translateOutputArea.classList.remove('hidden');
+                        showToast('msgHistoryRestored', false);
                     }
-                    showToast('msgHistoryRestored', false);
+                });
+
+                dom.resultAlignLeftBtn.addEventListener('click', () => {
+                    dom.outputText.style.textAlign = 'left';
+                    dom.outputText.dir = 'ltr';
+                });
+                dom.resultAlignCenterBtn.addEventListener('click', () => {
+                    dom.outputText.style.textAlign = 'center';
+                });
+                dom.resultAlignRightBtn.addEventListener('click', () => {
+                    dom.outputText.style.textAlign = 'right';
+                    dom.outputText.dir = 'rtl';
+                });
+
+                dom.translateAlignLeftBtn.addEventListener('click', () => {
+                    dom.translateOutputArea.style.textAlign = 'left';
+                    dom.translateOutputArea.dir = 'ltr';
+                });
+                dom.translateAlignCenterBtn.addEventListener('click', () => {
+                    dom.translateOutputArea.style.textAlign = 'center';
+                });
+                dom.translateAlignRightBtn.addEventListener('click', () => {
+                    dom.translateOutputArea.style.textAlign = 'right';
+                    dom.translateOutputArea.dir = 'rtl';
                 });
 
                 dom.translateHistoryModalBtn.addEventListener('click', () => {
@@ -1442,6 +1797,7 @@
                 });
 
                 dom.modalCloseBtn.addEventListener('click', () => dom.messageModal.classList.add('hidden'));
+                dom.modalCopyBtn.addEventListener('click', () => copyTextToClipboard(dom.modalMessage.textContent));
 
                 if (dom.translateInputClearBtn) {
                     dom.translateInputClearBtn.addEventListener('click', () => {
@@ -1473,7 +1829,6 @@
                 });
             }
 
-            // --- Initial Load ---
             initializeApp();
         });
     </script>

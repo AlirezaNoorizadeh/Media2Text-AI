@@ -1,12 +1,26 @@
 <!DOCTYPE html>
+<!-- Defaults to English and Dark Mode -->
 <html lang="en" dir="ltr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title data-key="pageTitle">Content-to-Text Converter</title>
 
+    <!--
+        Enables SharedArrayBuffer (required by FFmpeg.wasm for the chunking feature) when this
+        page is served without Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers
+        set by the host (e.g. GitHub Pages, a plain static file server, etc). This file MUST sit
+        next to this HTML file on the SAME origin, and the page must be loaded via http(s):// or
+        localhost — it will NOT work when the file is opened directly as file://.
+        Source: https://github.com/gzuidhof/coi-serviceworker (MIT license)
+    -->
+    <script src="coi-serviceworker.js"></script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <!-- FFmpeg.wasm for Browser-side Audio Processing & Chunking -->
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -19,12 +33,41 @@
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        /* Use Vazirmatn for all languages */
         body {
             font-family: 'Vazirmatn', sans-serif;
         }
 
-        /* Glow Effect Styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
         .glow-card {
             position: relative;
             --glow-color: rgba(56, 189, 248, 0.55);
@@ -52,14 +95,20 @@
             opacity: 1;
         }
 
-        /* Disabled Section Style */
         .disabled-section {
             opacity: 0.5;
             pointer-events: none;
             filter: blur(1px);
         }
 
-        /* Drop Zone Style */
+        #chunks-output-wrapper > summary {
+            list-style: none;
+        }
+
+            #chunks-output-wrapper > summary::-webkit-details-marker {
+                display: none;
+            }
+
         .drop-zone {
             border: 2px dashed #9ca3af;
             border-radius: 0.75rem;
@@ -79,12 +128,11 @@
             border-color: #38bdf8;
         }
 
-        /* Modal & Toast Styles */
-        #message-modal, #toast-notification, #history-modal, #translate-history-modal, #reset-modal {
+        #message-modal, #toast-notification, #history-modal, #translate-history-modal, #reset-modal, #expand-modal {
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         }
 
-            #message-modal.hidden, #toast-notification.hidden, #history-modal.hidden, #translate-history-modal.hidden, #reset-modal.hidden {
+            #message-modal.hidden, #toast-notification.hidden, #history-modal.hidden, #translate-history-modal.hidden, #reset-modal.hidden, #expand-modal.hidden {
                 opacity: 0;
                 pointer-events: none;
             }
@@ -93,8 +141,7 @@
                 transform: translateY(20px);
             }
 
-        /* Editable textarea styling */
-        #output-text-area, #translate-input-area, #translate-output-area {
+        #output-text-area, #translate-input-area, #translate-output-area, #expand-text-area {
             background: transparent;
             border: none;
             width: 100%;
@@ -104,74 +151,154 @@
             font-family: inherit;
         }
 
-        /* Custom Select Arrow */
-        .custom-select {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
+        .custom-dropdown {
+            position: relative;
+            user-select: none;
+        }
+
+        .custom-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            height: 50px;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .custom-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            max-height: 260px;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .dark .custom-dropdown-menu {
+            background-color: #1e293b;
+            border-color: #475569;
+        }
+
+        .custom-dropdown.open .custom-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .custom-dropdown-item {
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            color: #1e293b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .dark .custom-dropdown-item {
+            color: #f1f5f9;
+        }
+
+        .custom-dropdown-item:hover, .custom-dropdown-item.selected {
+            background-color: #0ea5e9 !important;
+            color: #ffffff !important;
+        }
+
+        .model-tag-badge {
+            font-size: 0.72rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            border: 1px solid rgba(14, 165, 233, 0.3);
+            background-color: rgba(14, 165, 233, 0.1);
+            color: #0284c7;
+        }
+
+        .dark .model-tag-badge {
+            border-color: rgba(56, 189, 248, 0.3);
+            background-color: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
         }
     </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300">
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 transition-colors duration-300 min-h-screen flex flex-col justify-between">
 
-    <div id="main-container" class="max-w-4xl mx-auto p-4 md:p-8">
+    <div id="main-container" class="max-w-4xl mx-auto p-4 md:p-8 w-full">
 
         <header class="text-center mb-10 relative">
             <h1 class="text-4xl font-bold text-slate-800 dark:text-white mx-12" data-key="mainTitle">Content-to-Text Converter</h1>
             <p class="text-lg mt-2 text-slate-600 dark:text-slate-300" data-key="subTitle">Easily convert your audio, image, and video files to text.</p>
-            <button id="reset-app-btn" class="absolute top-0 right-0 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="resetAppBtnTooltip" title="Reset Application">
+            <button id="reset-app-btn" class="absolute top-0 right-0 inline-flex items-center justify-center text-slate-500 hover:text-red-500 transition-colors p-1 rounded-lg" data-key="resetAppBtnTooltip" title="Reset Application">
                 <iconify-icon icon="mdi:power" width="24" height="24"></iconify-icon>
             </button>
         </header>
 
         <main class="space-y-8">
-
-            <!-- API Settings Section -->
             <section id="api-settings" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
                 <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-white" data-key="apiSettingsTitle">1. API Settings</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div>
-                        <label for="api-provider" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiProviderLabel">API Provider</label>
-                        <div class="relative">
-                            <select id="api-provider" class="custom-select w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <option value="gemini">Gemini</option>
+                    <div class="md:col-span-1">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiProviderLabel">API Provider</label>
+                        <div id="api-provider-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <span class="selected-text truncate">Gemini</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="gemini">Gemini</div>
+                                <div class="custom-dropdown-item" data-value="openai">OpenAI</div>
+                                <div class="custom-dropdown-item" data-value="claude">Claude</div>
+                            </div>
+                            <select id="api-provider" class="hidden">
+                                <option value="gemini" selected>Gemini</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="claude">Claude</option>
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label for="api-model" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiModelLabel">Model</label>
-                        <div class="relative">
-                            <select id="api-model" class="custom-select w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <!-- Models will be populated dynamically -->
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
+
+                    <div class="md:col-span-2">
                         <label for="api-key" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiKeyLabel">API Key</label>
                         <div class="relative">
-                            <input type="password" id="api-key" class="w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent" data-key="apiKeyPlaceholder" placeholder="Enter your API key here">
-                            <button id="toggle-api-key-visibility" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-sky-500 rtl:right-auto rtl:left-0">
+                            <input type="password" id="api-key" class="w-full h-[50px] bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-sky-500" data-key="apiKeyPlaceholder" placeholder="Enter your API key here">
+                            <button id="toggle-api-key-visibility" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-sky-500">
                                 <iconify-icon icon="mdi:eye-outline" width="20" height="20"></iconify-icon>
                             </button>
                         </div>
                     </div>
-                </div>
-                <div class="flex flex-wrap gap-2 mt-4">
-                    <button id="save-api-key" class="w-full md:w-auto bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="saveApiKeyBtn">Save & Activate</button>
-                    <button id="fetch-models-btn" class="w-full md:w-auto bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="fetchModelsBtn">🔄 Fetch Models</button>
+
+                    <div class="md:col-span-3 mt-2">
+                        <button id="save-api-key" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors" data-key="saveApiKeyBtn">Save & Activate</button>
+                    </div>
+
+                    <div id="model-select-wrapper" class="md:col-span-3 hidden">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="apiModelLabel">Model</label>
+                        <div id="api-model-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <span class="selected-text truncate">Select model</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu"></div>
+                            <select id="api-model" class="hidden"></select>
+                        </div>
+                    </div>
                 </div>
             </section>
 
             <div id="main-app-wrapper" class="disabled-section transition-all duration-500">
-                <!-- Upload & Convert Section -->
                 <section id="converter" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
                     <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-white" data-key="uploadTitle">2. Upload & Convert</h2>
 
@@ -186,58 +313,154 @@
 
                     <div id="file-preview" class="mt-4"></div>
 
+                    <!-- FFmpeg Chunking Options (Shows up for Audio/Video) -->
+                    <div id="ffmpeg-settings" class="mt-4 p-4 border border-sky-500/30 rounded-lg bg-sky-50/50 dark:bg-slate-700/50 hidden">
+                        <div class="flex items-center gap-2 mb-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
+                            <iconify-icon icon="mdi:tune-vertical" width="20" height="20"></iconify-icon>
+                            <span data-key="ffmpegTitle">FFmpeg Processing Options</span>
+                        </div>
+                        <div id="ffmpeg-coi-warning" class="hidden flex items-start gap-2 mb-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300/50 dark:border-amber-700/40 text-xs text-amber-700 dark:text-amber-400">
+                            <iconify-icon icon="mdi:alert-outline" width="18" height="18" class="flex-shrink-0 mt-0.5"></iconify-icon>
+                            <span data-key="msgCoiUnavailable">Chunking requires this page to be served with special security headers, which aren't active right now (chunking has been disabled and the whole file will be sent at once).</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" data-key="chunkDurationLabel">Chunk Duration (Minutes)</label>
+                                <div id="chunk-duration-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                    <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 40px; padding: 0.5rem 0.75rem;">
+                                        <span class="selected-text truncate" data-key="chunk5min">5 Minutes per chunk</span>
+                                        <iconify-icon icon="mdi:chevron-down" width="18" height="18" class="text-slate-500"></iconify-icon>
+                                    </div>
+                                    <div class="custom-dropdown-menu">
+                                        <div class="custom-dropdown-item" data-value="180" data-key="chunk3min">3 Minutes per chunk (Recommended)</div>
+                                        <div class="custom-dropdown-item selected" data-value="300" data-key="chunk5min">5 Minutes per chunk</div>
+                                        <div class="custom-dropdown-item" data-value="600" data-key="chunk10min">10 Minutes per chunk</div>
+                                        <div class="custom-dropdown-item" data-value="900" data-key="chunk15min">15 Minutes per chunk</div>
+                                        <div class="custom-dropdown-item" data-value="0" data-key="chunkDisabled">Disabled (Process Entire File)</div>
+                                    </div>
+                                    <select id="chunk-duration" class="hidden">
+                                        <option value="180" data-key="chunk3min">3 Minutes per chunk (Recommended)</option>
+                                        <option value="300" selected data-key="chunk5min">5 Minutes per chunk</option>
+                                        <option value="600" data-key="chunk10min">10 Minutes per chunk</option>
+                                        <option value="900" data-key="chunk15min">15 Minutes per chunk</option>
+                                        <option value="0" data-key="chunkDisabled">Disabled (Process Entire File)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" data-key="bitrateLabel">Audio Bitrate (kbps)</label>
+                                <div id="chunk-bitrate-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                    <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 40px; padding: 0.5rem 0.75rem;">
+                                        <span class="selected-text truncate" data-key="bitrate128">128 kbps (Recommended)</span>
+                                        <iconify-icon icon="mdi:chevron-down" width="18" height="18" class="text-slate-500"></iconify-icon>
+                                    </div>
+                                    <div class="custom-dropdown-menu">
+                                        <div class="custom-dropdown-item" data-value="32">32 kbps</div>
+                                        <div class="custom-dropdown-item" data-value="64">64 kbps</div>
+                                        <div class="custom-dropdown-item" data-value="96">96 kbps</div>
+                                        <div class="custom-dropdown-item selected" data-value="128" data-key="bitrate128">128 kbps (Recommended)</div>
+                                        <div class="custom-dropdown-item" data-value="160">160 kbps</div>
+                                        <div class="custom-dropdown-item" data-value="192">192 kbps</div>
+                                        <div class="custom-dropdown-item" data-value="256">256 kbps</div>
+                                        <div class="custom-dropdown-item" data-value="320">320 kbps</div>
+                                    </div>
+                                    <select id="chunk-bitrate" class="hidden">
+                                        <option value="32">32 kbps</option>
+                                        <option value="64">64 kbps</option>
+                                        <option value="96">96 kbps</option>
+                                        <option value="128" selected data-key="bitrate128">128 kbps (Recommended)</option>
+                                        <option value="160">160 kbps</option>
+                                        <option value="192">192 kbps</option>
+                                        <option value="256">256 kbps</option>
+                                        <option value="320">320 kbps</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <label class="inline-flex items-center cursor-pointer text-xs text-slate-600 dark:text-slate-300">
+                                    <input type="checkbox" id="extract-audio-only" checked class="sr-only peer">
+                                    <div class="relative w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-sky-500"></div>
+                                    <span class="ms-2 font-medium" data-key="extractAudioLabel">Auto Extract & Compress Audio (MP3)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mt-6">
-                        <label for="language-select" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="languageLabel">Content Language</label>
-                        <div class="relative">
-                            <select id="language-select" class="custom-select w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pl-3 pr-10 rtl:pr-3 rtl:pl-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                <option value="auto" data-key="langAuto">Auto-detect</option>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="languageLabel">Content Language</label>
+                        <div id="language-select-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                <span class="selected-text truncate" data-key="langAuto">Auto-detect</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="auto" data-key="langAuto">Auto-detect</div>
+                                <div class="custom-dropdown-item" data-value="fa" data-key="langFa">Persian</div>
+                                <div class="custom-dropdown-item" data-value="en" data-key="langEn">English</div>
+                                <div class="custom-dropdown-item" data-value="ar" data-key="langAr">Arabic</div>
+                                <div class="custom-dropdown-item" data-value="es" data-key="langEs">Spanish</div>
+                                <div class="custom-dropdown-item" data-value="fr" data-key="langFr">French</div>
+                            </div>
+                            <select id="language-select" class="hidden">
+                                <option value="auto" selected data-key="langAuto">Auto-detect</option>
                                 <option value="fa" data-key="langFa">Persian</option>
                                 <option value="en" data-key="langEn">English</option>
                                 <option value="ar" data-key="langAr">Arabic</option>
                                 <option value="es" data-key="langEs">Spanish</option>
                                 <option value="fr" data-key="langFr">French</option>
                             </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                            </div>
                         </div>
                     </div>
 
                     <button id="convert-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
-                        <iconify-icon id="convert-icon" icon="mdi:refresh"></iconify-icon>
+                        <iconify-icon id="convert-icon" icon="mdi:refresh" class="hidden"></iconify-icon>
                         <span id="convert-btn-text" data-key="convertBtn">Convert to Text</span>
                     </button>
                 </section>
 
-                <!-- Result Section -->
                 <section id="result" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 mt-8">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                         <h2 class="text-2xl font-bold text-slate-800 dark:text-white" data-key="resultTitle">3. Result</h2>
-                        <div class="flex items-center gap-2">
-                            <button id="history-modal-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="historyBtnTooltip" title="History">
-                                <iconify-icon icon="mdi:history" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="restore-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="restoreBtnTooltip" title="Restore last result">
-                                <iconify-icon icon="mdi:restore" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
-                            </button>
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                            <button id="result-align-left-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Left Align"><iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon></button>
+                            <button id="result-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
+                            <button id="result-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="result-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
+                            <button id="history-modal-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="historyBtnTooltip" title="History"><iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon></button>
+                            <button id="restore-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="restoreBtnTooltip" title="Restore last result"><iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon></button>
+                            <button id="clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
+                            <button id="copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
                         </div>
                     </div>
+                    <h3 id="final-result-label" class="hidden text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
+                        <iconify-icon icon="mdi:link-variant" width="16" height="16"></iconify-icon>
+                        <span id="final-result-label-text">Final Combined Result</span>
+                    </h3>
                     <div id="output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
                         <p id="output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="outputPlaceholder">converted text will appear here</p>
-                        <div id="loader" class="flex hidden">
-                            <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
+                        <div id="loader" class="flex flex-col items-center justify-center gap-3 hidden">
+                            <div class="relative w-16 h-16 flex items-center justify-center">
+                                <svg id="progress-svg" class="w-full h-full transform -rotate-90 hidden" viewBox="0 0 36 36">
+                                    <path class="text-slate-300 dark:text-slate-600" stroke-width="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path id="progress-circle-path" class="text-sky-500" stroke-width="3.8" stroke-dasharray="0, 100" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                </svg>
+                                <iconify-icon id="infinite-spinner" icon="mdi:loading" class="animate-spin text-sky-500 absolute" width="50" height="50" dir="ltr"></iconify-icon>
+                            </div>
+                            <span id="result-loader-text" class="text-xs text-slate-500 dark:text-slate-400 font-semibold text-center"></span>
                         </div>
                         <textarea id="output-text-area" class="min-h-[200px] hidden"></textarea>
                     </div>
+                    <details id="chunks-output-wrapper" class="hidden mt-4 group">
+                        <summary class="cursor-pointer select-none text-sm font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2 py-1">
+                            <iconify-icon icon="mdi:chevron-right" width="16" height="16" class="transition-transform group-open:rotate-90"></iconify-icon>
+                            <iconify-icon icon="mdi:view-list-outline" width="16" height="16"></iconify-icon>
+                            <span data-key="chunksResultTitle">Chunk Results</span>
+                        </summary>
+                        <div id="chunks-output-list" class="space-y-2 mt-2"></div>
+                    </details>
                 </section>
 
-                <!-- Translation Section -->
                 <section id="translation-section" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 mt-8">
                     <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-white" data-key="translateTitle">4. Translate & Format</h2>
 
@@ -245,12 +468,12 @@
                         <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateSourceLabel">Input Source</label>
                         <div class="flex items-center gap-4">
                             <div class="flex items-center">
-                                <input id="source-result" name="translate-source" type="radio" checked class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 focus:ring-sky-500 dark:focus:ring-sky-600">
-                                <label for="source-result" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="sourceResultLabel">From Result Box</label>
+                                <input id="source-result" name="translate-source" type="radio" checked class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300">
+                                <label for="source-result" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceResultLabel">From Result Box</label>
                             </div>
                             <div class="flex items-center">
-                                <input id="source-manual" name="translate-source" type="radio" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 focus:ring-sky-500 dark:focus:ring-sky-600">
-                                <label for="source-manual" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="sourceManualLabel">Manual Input</label>
+                                <input id="source-manual" name="translate-source" type="radio" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300">
+                                <label for="source-manual" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceManualLabel">Manual Input</label>
                             </div>
                         </div>
                     </div>
@@ -258,13 +481,10 @@
                     <div id="translate-input-container-wrapper" class="hidden mb-4">
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translationHistoryInput">Input</h3>
-                            <div class="flex items-center gap-2">
-                                <button id="translate-input-clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                    <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
-                                </button>
-                                <button id="translate-input-copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                    <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
-                                </button>
+                            <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                                <button id="translate-input-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
+                                <button id="translate-input-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
+                                <button id="translate-input-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
                             </div>
                         </div>
                         <div id="translate-input-container" class="w-full min-h-[150px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
@@ -274,133 +494,298 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                         <div>
-                            <label for="translate-language-select" class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateLangLabel">Translate to</label>
-                            <div class="relative">
-                                <select id="translate-language-select" class="custom-select w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg p-2.5 pl-3 pr-10 rtl:pr-3 rtl:pl-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
-                                    <option value="fa" data-key="langFa">Persian</option>
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateModeLabel">Action Mode</label>
+                            <div id="translate-mode-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                    <span class="selected-text truncate" data-key="modeBoth">Translate & Format</span>
+                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                                </div>
+                                <div class="custom-dropdown-menu">
+                                    <div class="custom-dropdown-item selected" data-value="both" data-key="modeBoth">Translate & Format</div>
+                                    <div class="custom-dropdown-item" data-value="translate" data-key="modeTranslateOnly">Translate Only</div>
+                                    <div class="custom-dropdown-item" data-value="format" data-key="modeFormatOnly">Format Only</div>
+                                </div>
+                                <select id="translate-mode-select" class="hidden">
+                                    <option value="both" selected data-key="modeBoth">Translate & Format</option>
+                                    <option value="translate" data-key="modeTranslateOnly">Translate Only</option>
+                                    <option value="format" data-key="modeFormatOnly">Format Only</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="target-lang-wrapper">
+                            <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateLangLabel">Translate to</label>
+                            <div id="translate-language-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                    <span class="selected-text truncate" data-key="langFa">Persian</span>
+                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                                </div>
+                                <div class="custom-dropdown-menu">
+                                    <div class="custom-dropdown-item selected" data-value="fa" data-key="langFa">Persian</div>
+                                    <div class="custom-dropdown-item" data-value="en" data-key="langEn">English</div>
+                                    <div class="custom-dropdown-item" data-value="ar" data-key="langAr">Arabic</div>
+                                    <div class="custom-dropdown-item" data-value="es" data-key="langEs">Spanish</div>
+                                    <div class="custom-dropdown-item" data-value="fr" data-key="langFr">French</div>
+                                </div>
+                                <select id="translate-language-select" class="hidden">
+                                    <option value="fa" selected data-key="langFa">Persian</option>
                                     <option value="en" data-key="langEn">English</option>
                                     <option value="ar" data-key="langAr">Arabic</option>
                                     <option value="es" data-key="langEs">Spanish</option>
                                     <option value="fr" data-key="langFr">French</option>
                                 </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 rtl:right-auto rtl:left-0">
-                                    <iconify-icon icon="mdi:chevron-down" width="20" height="20"></iconify-icon>
-                                </div>
                             </div>
                         </div>
-                        <div class="flex items-center pt-6">
-                            <input id="format-checkbox" type="checkbox" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300 rounded focus:ring-sky-500 dark:focus:ring-sky-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                            <label for="format-checkbox" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" data-key="formatCheckboxLabel">Format & structure the text</label>
-                        </div>
                     </div>
-                    <button id="translate-btn" class="mt-6 w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
+
+                    <button id="translate-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
                         <iconify-icon id="translate-icon" icon="mdi:translate"></iconify-icon>
-                        <span id="translate-btn-text" data-key="translateBtn">Translate</span>
+                        <span id="translate-btn-text" data-key="translateBtn">Process</span>
                     </button>
 
-                    <div class="flex justify-between items-center my-4">
-                        <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translateOutputTitle">Translated Text</h3>
-                        <div class="flex items-center gap-2">
-                            <button id="translate-history-modal-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="historyBtnTooltip" title="History">
-                                <iconify-icon icon="mdi:history" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="translate-restore-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="restoreBtnTooltip" title="Restore last result">
-                                <iconify-icon icon="mdi:restore" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="translate-clear-btn" class="text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors" data-key="clearBtnTooltip" title="Clear result">
-                                <iconify-icon icon="mdi:eraser" width="22" height="22"></iconify-icon>
-                            </button>
-                            <button id="translate-copy-btn" class="text-slate-500 hover:text-sky-500 dark:text-slate-400 dark:hover:text-sky-400 transition-colors" data-key="copyBtnTooltip" title="Copy text">
-                                <iconify-icon icon="mdi:content-copy" width="22" height="22"></iconify-icon>
-                            </button>
+                    <div class="flex justify-between items-center my-4 flex-wrap gap-2">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translateOutputTitle">Processed Text</h3>
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                            <button id="translate-align-left-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Left Align"><iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="translate-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-history-modal-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="historyBtnTooltip" title="History"><iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-restore-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="restoreBtnTooltip" title="Restore last result"><iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
+                            <button id="translate-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
                         </div>
                     </div>
-                    <div id="translate-output-container" class="w-full min-h-[150px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-700 dark:text-slate-200 whitespace-pre-wrap flex items-center justify-center">
-                        <p id="translate-output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="translateOutputPlaceholder">translation will appear here</p>
-                        <div id="translate-loader" class="flex hidden">
-                            <iconify-icon icon="mdi:loading" class="animate-spin text-teal-500" width="50" height="50" dir="ltr"></iconify-icon>
+
+                    <div id="translate-output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
+                        <p id="translate-output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="translateOutputPlaceholder">result will appear here</p>
+                        <div id="translate-loader" class="flex flex-col items-center justify-center gap-3 hidden">
+                            <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
                         </div>
-                        <textarea id="translate-output-area" class="min-h-[120px] hidden"></textarea>
+                        <textarea id="translate-output-area" class="min-h-[200px] hidden"></textarea>
                     </div>
                 </section>
             </div>
         </main>
 
-        <!-- Control Buttons -->
         <div class="fixed bottom-4 left-4 z-20 flex flex-col gap-3" dir="ltr">
-            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden">
-                <button id="lang-en" class="px-3 py-2 text-sm font-semibold">EN</button>
-                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold">FA</button>
+            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                <button id="lang-en" class="px-3 py-2 text-sm font-semibold transition-colors">EN</button>
+                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold transition-colors">FA</button>
             </div>
-            <button id="theme-toggle-btn" class="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Toggle theme">
+            <button id="theme-toggle-btn" class="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700" aria-label="Toggle theme">
                 <iconify-icon icon="mdi:weather-night" class="text-slate-500 dark:hidden" width="24" height="24"></iconify-icon>
                 <iconify-icon icon="mdi:white-balance-sunny" class="text-slate-500 hidden dark:inline" width="24" height="24"></iconify-icon>
             </button>
         </div>
 
-        <!-- Message Modal -->
-        <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
-                <h3 id="modal-title" class="text-xl font-bold mb-4">Message</h3>
-                <p id="modal-message" class="text-slate-600 dark:text-slate-300 mb-6"></p>
-                <button id="modal-close-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="modalCloseBtn">OK</button>
-            </div>
-        </div>
-
-        <!-- Reset Confirmation Modal -->
-        <div id="reset-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
-                <h3 class="text-xl font-bold mb-4 text-red-500" data-key="resetModalTitle">Reset Application?</h3>
-                <p class="text-slate-600 dark:text-slate-300 mb-6" data-key="resetModalText">This will clear all saved data including API key, history, and settings. This action cannot be undone.</p>
-                <div class="flex justify-center gap-4">
-                    <button id="reset-cancel-btn" class="bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-200 font-bold py-2 px-6 rounded-xl transition-colors" data-key="resetCancelBtn">Cancel</button>
-                    <button id="reset-confirm-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-xl transition-colors" data-key="resetConfirmBtn">Confirm Reset</button>
+        <!-- Expanded Modal -->
+        <div id="expand-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 md:p-8 z-50 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+                <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <iconify-icon icon="mdi:arrow-expand-all" class="text-sky-500"></iconify-icon>
+                        <span data-key="expandModalTitle">Expanded View</span>
+                    </h3>
+                    <div class="flex items-center gap-2" dir="ltr">
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 p-1">
+                            <button id="expand-align-left-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Left Align"><iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon></button>
+                            <button id="expand-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
+                            <button id="expand-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
+                        </div>
+                        <button id="expand-copy-btn" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-500 transition-colors flex items-center gap-1.5 text-sm font-medium">
+                            <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
+                            <span data-key="copyBtnTooltip">Copy text</span>
+                        </button>
+                        <button id="expand-close-btn" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-1.5 text-sm font-bold">
+                            <iconify-icon icon="mdi:arrow-collapse-all" width="18" height="18"></iconify-icon>
+                            <span data-key="collapseBtn">Collapse</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/30">
+                    <textarea id="expand-text-area" class="w-full h-full text-base md:text-lg leading-relaxed text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none resize-none" placeholder=""></textarea>
                 </div>
             </div>
         </div>
 
-        <!-- History Modals -->
+        <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-md w-full text-center flex flex-col max-h-[85vh]">
+                <h3 id="modal-title" class="text-xl font-bold mb-4">Message</h3>
+                <div id="modal-msg-container" class="relative bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-left rtl:text-right overflow-y-auto max-h-[300px] my-2 group">
+                    <button id="modal-copy-btn" class="absolute top-2 right-2 inline-flex items-center justify-center p-1.5 text-slate-500 hover:text-sky-500 bg-white dark:bg-slate-800 rounded shadow" title="Copy Error text">
+                        <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
+                    </button>
+                    <p id="modal-message" class="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap break-words pr-8 rtl:pr-0 rtl:pl-8"></p>
+                </div>
+                <button id="modal-close-btn" class="mt-4 bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-6 rounded-xl transition-colors self-center" data-key="modalCloseBtn">OK</button>
+            </div>
+        </div>
+
+        <div id="reset-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-sm w-full text-center">
+                <h3 class="text-xl font-bold mb-4 text-red-500" data-key="resetModalTitle">Reset Application?</h3>
+                <p class="text-slate-600 dark:text-slate-300 mb-6" data-key="resetModalText">This will clear all saved data including API key, history, and settings. This action cannot be undone.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="reset-cancel-btn" class="bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-2 px-6 rounded-xl" data-key="resetCancelBtn">Cancel</button>
+                    <button id="reset-confirm-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-xl" data-key="resetConfirmBtn">Confirm Reset</button>
+                </div>
+            </div>
+        </div>
+
         <div id="history-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 hidden">
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full flex flex-col" style="max-height: 80vh;">
                 <div class="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 class="text-xl font-bold" data-key="historyModalTitle">Transcription History</h3>
-                    <button id="history-modal-close-btn" class="text-slate-500 hover:text-red-500"><iconify-icon icon="mdi:close" width="24" height="24"></iconify-icon></button>
+                    <button id="history-modal-close-btn" class="inline-flex items-center justify-center text-slate-500 hover:text-red-500"><iconify-icon icon="mdi:close" width="24" height="24"></iconify-icon></button>
                 </div>
                 <div id="history-list" class="p-4 overflow-y-auto space-y-4"></div>
             </div>
         </div>
+
         <div id="translate-history-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 hidden">
             <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full flex flex-col" style="max-height: 80vh;">
                 <div class="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 class="text-xl font-bold" data-key="translateHistoryModalTitle">Translation History</h3>
-                    <button id="translate-history-modal-close-btn" class="text-slate-500 hover:text-red-500"><iconify-icon icon="mdi:close" width="24" height="24"></iconify-icon></button>
+                    <button id="translate-history-modal-close-btn" class="inline-flex items-center justify-center text-slate-500 hover:text-red-500"><iconify-icon icon="mdi:close" width="24" height="24"></iconify-icon></button>
                 </div>
                 <div id="translate-history-list" class="p-4 overflow-y-auto space-y-4"></div>
             </div>
         </div>
 
-        <!-- Toast Notification -->
-        <div id="toast-notification" class="fixed bottom-4 right-4 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg hidden flex items-center gap-2">
+        <div id="toast-notification" class="fixed bottom-4 right-4 bg-slate-800 text-white py-2 px-4 rounded-lg shadow-lg hidden flex items-center gap-2 z-50">
             <span id="toast-icon"></span>
             <p id="toast-message"></p>
         </div>
 
     </div>
 
+    <footer class="mt-12 py-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400" dir="ltr">
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+            <span>© 2026 Content-to-Text Converter</span>
+            <span>•</span>
+            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
+                <iconify-icon icon="mdi:github" width="18" height="18"></iconify-icon>
+                GitHub
+            </a>
+            <span>•</span>
+            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
+                <iconify-icon icon="mdi:license" width="16" height="16"></iconify-icon>
+                License (MIT)
+            </a>
+        </div>
+    </footer>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DOM Selectors ---
+            const { createFFmpeg, fetchFile } = FFmpeg;
+            let ffmpeg = null;
+
+            function initCustomDropdown(dropdownId, onSelectCallback) {
+                const container = document.getElementById(dropdownId);
+                if (!container) return;
+                const trigger = container.querySelector('.custom-dropdown-trigger');
+                const menu = container.querySelector('.custom-dropdown-menu');
+                const select = container.querySelector('select');
+                const selectedTextSpan = trigger.querySelector('.selected-text');
+                const chevron = trigger.querySelector('iconify-icon');
+
+                trigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.custom-dropdown').forEach(d => {
+                        if (d !== container) d.classList.remove('open');
+                    });
+                    const isOpen = container.classList.toggle('open');
+                    if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+                });
+
+                menu.addEventListener('click', (e) => {
+                    const item = e.target.closest('.custom-dropdown-item');
+                    if (!item) return;
+                    const value = item.getAttribute('data-value');
+                    const labelElem = item.querySelector('.model-name-text') || item;
+                    const text = labelElem.textContent;
+
+                    menu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+
+                    selectedTextSpan.textContent = text;
+                    if (item.hasAttribute('data-key')) {
+                        selectedTextSpan.setAttribute('data-key', item.getAttribute('data-key'));
+                    } else {
+                        selectedTextSpan.removeAttribute('data-key');
+                    }
+
+                    container.classList.remove('open');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+
+                    if (select) {
+                        select.value = value;
+                        select.dispatchEvent(new Event('change'));
+                    }
+
+                    if (onSelectCallback) onSelectCallback(value, text);
+                });
+
+                document.addEventListener('click', () => {
+                    container.classList.remove('open');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+                });
+            }
+
+            function setCustomDropdownValue(dropdownId, value, text) {
+                const container = document.getElementById(dropdownId);
+                if (!container) return;
+                const menu = container.querySelector('.custom-dropdown-menu');
+                const selectedTextSpan = container.querySelector('.selected-text');
+                const select = container.querySelector('select');
+
+                let targetItem = null;
+                menu.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                    if (item.getAttribute('data-value') === value) {
+                        item.classList.add('selected');
+                        targetItem = item;
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+
+                if (targetItem) {
+                    const labelElem = targetItem.querySelector('.model-name-text') || targetItem;
+                    selectedTextSpan.textContent = labelElem.textContent;
+                    if (targetItem.hasAttribute('data-key')) {
+                        selectedTextSpan.setAttribute('data-key', targetItem.getAttribute('data-key'));
+                    } else {
+                        selectedTextSpan.removeAttribute('data-key');
+                    }
+                } else if (text) {
+                    selectedTextSpan.textContent = text;
+                    selectedTextSpan.removeAttribute('data-key');
+                }
+
+                if (select) select.value = value;
+            }
+
             const dom = {
                 html: document.documentElement,
                 apiKeyInput: document.getElementById('api-key'),
                 apiProviderSelect: document.getElementById('api-provider'),
                 apiModelSelect: document.getElementById('api-model'),
+                modelSelectWrapper: document.getElementById('model-select-wrapper'),
                 saveApiKeyBtn: document.getElementById('save-api-key'),
-                fetchModelsBtn: document.getElementById('fetch-models-btn'),
                 mainAppWrapper: document.getElementById('main-app-wrapper'),
                 dropZone: document.getElementById('drop-zone'),
                 fileInput: document.getElementById('file-input'),
                 filePreview: document.getElementById('file-preview'),
+                ffmpegSettings: document.getElementById('ffmpeg-settings'),
+                ffmpegCoiWarning: document.getElementById('ffmpeg-coi-warning'),
+                chunkDurationSelect: document.getElementById('chunk-duration'),
+                chunkBitrateSelect: document.getElementById('chunk-bitrate'),
+                extractAudioOnlyCheckbox: document.getElementById('extract-audio-only'),
+                chunksOutputWrapper: document.getElementById('chunks-output-wrapper'),
+                chunksOutputList: document.getElementById('chunks-output-list'),
+                finalResultLabel: document.getElementById('final-result-label'),
+                finalResultLabelText: document.getElementById('final-result-label-text'),
                 convertBtn: document.getElementById('convert-btn'),
                 convertBtnText: document.getElementById('convert-btn-text'),
                 convertIcon: document.getElementById('convert-icon'),
@@ -414,7 +799,9 @@
                 messageModal: document.getElementById('message-modal'),
                 modalTitle: document.getElementById('modal-title'),
                 modalMessage: document.getElementById('modal-message'),
+                modalMsgContainer: document.getElementById('modal-msg-container'),
                 modalCloseBtn: document.getElementById('modal-close-btn'),
+                modalCopyBtn: document.getElementById('modal-copy-btn'),
                 resetAppBtn: document.getElementById('reset-app-btn'),
                 resetModal: document.getElementById('reset-modal'),
                 resetConfirmBtn: document.getElementById('reset-confirm-btn'),
@@ -433,10 +820,15 @@
                 toastIcon: document.getElementById('toast-icon'),
                 toastMessage: document.getElementById('toast-message'),
                 loader: document.getElementById('loader'),
+                resultLoaderText: document.getElementById('result-loader-text'),
+                progressSvg: document.getElementById('progress-svg'),
+                progressCirclePath: document.getElementById('progress-circle-path'),
+                infiniteSpinner: document.getElementById('infinite-spinner'),
                 translateBtn: document.getElementById('translate-btn'),
                 translateIcon: document.getElementById('translate-icon'),
+                translateModeSelect: document.getElementById('translate-mode-select'),
+                targetLangWrapper: document.getElementById('target-lang-wrapper'),
                 translateLangSelect: document.getElementById('translate-language-select'),
-                formatCheckbox: document.getElementById('format-checkbox'),
                 translateInputContainerWrapper: document.getElementById('translate-input-container-wrapper'),
                 translateInputContainer: document.getElementById('translate-input-container'),
                 translateInputArea: document.getElementById('translate-input-area'),
@@ -451,18 +843,33 @@
                 translateInputCopyBtn: document.getElementById('translate-input-copy-btn'),
                 translateInputClearBtn: document.getElementById('translate-input-clear-btn'),
                 toggleApiKeyVisibilityBtn: document.getElementById('toggle-api-key-visibility'),
+                resultAlignLeftBtn: document.getElementById('result-align-left-btn'),
+                resultAlignCenterBtn: document.getElementById('result-align-center-btn'),
+                resultAlignRightBtn: document.getElementById('result-align-right-btn'),
+                translateAlignLeftBtn: document.getElementById('translate-align-left-btn'),
+                translateAlignCenterBtn: document.getElementById('translate-align-center-btn'),
+                translateAlignRightBtn: document.getElementById('translate-align-right-btn'),
+                resultExpandBtn: document.getElementById('result-expand-btn'),
+                translateExpandBtn: document.getElementById('translate-expand-btn'),
+                translateInputExpandBtn: document.getElementById('translate-input-expand-btn'),
+                expandModal: document.getElementById('expand-modal'),
+                expandTextArea: document.getElementById('expand-text-area'),
+                expandCloseBtn: document.getElementById('expand-close-btn'),
+                expandCopyBtn: document.getElementById('expand-copy-btn'),
+                expandAlignLeftBtn: document.getElementById('expand-align-left-btn'),
+                expandAlignCenterBtn: document.getElementById('expand-align-center-btn'),
+                expandAlignRightBtn: document.getElementById('expand-align-right-btn'),
             };
 
-            // --- State Variables ---
             let selectedFile = null;
-            let lastResult = '';
-            let lastTranslation = {};
+            let activeExpandedTextArea = null;
+            let lastResult = localStorage.getItem('lastResult') || '';
+            let lastTranslation = JSON.parse(localStorage.getItem('lastTranslation') || '{}');
             let toastTimeout;
             let currentLang = 'en';
             let transcriptionHistory = [];
             let translationHistory = [];
 
-            // --- Translations ---
             const translations = {
                 en: {
                     pageTitle: "Content-to-Text Converter",
@@ -474,7 +881,6 @@
                     apiKeyLabel: "API Key",
                     apiKeyPlaceholder: "Enter your API key here",
                     saveApiKeyBtn: "Save & Activate",
-                    fetchModelsBtn: "🔄 Fetch Models",
                     uploadTitle: "2. Upload & Convert",
                     dropZoneClick: "Click to upload",
                     dropZoneOr: " or drag and drop",
@@ -493,19 +899,25 @@
                     restoreBtnTooltip: "Restore last result",
                     historyBtnTooltip: "History",
                     resetAppBtnTooltip: "Reset Application",
+                    expandBtnTooltip: "Expand view",
+                    expandModalTitle: "Expanded View",
+                    collapseBtn: "Collapse",
                     outputPlaceholder: "converted text will appear here",
                     modalCloseBtn: "OK",
                     removeFileBtn: "Remove",
                     translateTitle: "4. Translate & Format",
-                    translateOutputTitle: "Translated Text",
+                    translateOutputTitle: "Processed Text",
+                    translateModeLabel: "Action Mode",
+                    modeBoth: "Translate & Format",
+                    modeTranslateOnly: "Translate Only",
+                    modeFormatOnly: "Format Only",
                     translateLangLabel: "Translate to",
-                    formatCheckboxLabel: "Format & structure the text",
-                    translateBtn: "Translate",
+                    translateBtn: "Process",
                     translateSourceLabel: "Input Source",
                     sourceResultLabel: "From Result Box",
                     sourceManualLabel: "Manual Input",
-                    translateInputPlaceholder: "Enter text to translate",
-                    translateOutputPlaceholder: "translation will appear here",
+                    translateInputPlaceholder: "Enter text to process",
+                    translateOutputPlaceholder: "result will appear here",
                     historyModalTitle: "Transcription History",
                     translateHistoryModalTitle: "Translation History",
                     historyFileNameLabel: "Source File:",
@@ -521,7 +933,7 @@
                     msgApiKeyError: "Please enter a valid API key.",
                     msgInvalidApiKeyError: "The API key is invalid or has expired. Please check it and try again.",
                     msgNoFile: "Please select a file first.",
-                    msgNoTextToTranslate: "There is no text to translate.",
+                    msgNoTextToTranslate: "There is no text to process.",
                     msgCopySuccess: "Copied to clipboard!",
                     msgCopyNoText: "No text to copy!",
                     msgResultCleared: "Result cleared.",
@@ -533,7 +945,7 @@
                     msgErrorTitle: "Error",
                     msgAttentionTitle: "Attention",
                     msgConverting: "Converting...",
-                    msgTranslating: "Translating...",
+                    msgTranslating: "Processing...",
                     msgSelectedFile: "Selected file:",
                     msgClaudeAudioUnsupported: "Claude API does not support audio/video transcription. Please select an image file or choose another provider.",
                     msgUnknownError: "An unknown error occurred. Please try again.",
@@ -542,7 +954,30 @@
                     msgFetchModelsSuccess: "Models loaded successfully!",
                     msgFetchModelsError: "Failed to fetch models. Please check your API key.",
                     msgNoModelsFound: "No models available for this provider.",
+                    msgNoModelsYet: "Enter your API key and click \"Save & Activate\" to load models.",
                     msgFetchingModels: "Fetching models...",
+                    msgCopyError: "Failed to copy text.",
+                    msgUploading: (percent, uploaded, total, speed, eta) => `Uploading: ${percent}% (${uploaded} / ${total} MB) - Speed: ${speed} MB/s | Remaining: ${eta}`,
+                    msgProcessingModel: "Uploading finished! Processing file with AI model...",
+                    ffmpegTitle: "FFmpeg Audio/Video Processing",
+                    chunkDurationLabel: "Chunk Duration (Minutes)",
+                    chunk3min: "3 Minutes per chunk (Recommended)",
+                    chunk5min: "5 Minutes per chunk",
+                    chunk10min: "10 Minutes per chunk",
+                    chunk15min: "15 Minutes per chunk",
+                    chunkDisabled: "Disabled (Process Entire File)",
+                    bitrateLabel: "Audio Bitrate (kbps)",
+                    bitrate128: "128 kbps (Recommended)",
+                    extractAudioLabel: "Auto Extract & Compress Audio (MP3)",
+                    msgFFmpegLoading: "Loading FFmpeg WebAssembly engine in browser...",
+                    msgFFmpegLoadError: "Failed to load the FFmpeg engine in this browser. Try a different browser, disable extensions, or set chunking to \"Disabled\".",
+                    msgCoiUnavailable: "Chunking requires this page to be served with special security headers, which aren't active right now (chunking has been disabled and the whole file will be sent at once).",
+                    msgFFmpegProcessing: (current, total) => `FFmpeg is chunking file: part ${current} of ${total}...`,
+                    msgProcessingChunk: (current, total) => `Transcribing chunk ${current} of ${total} with AI...`,
+                    chunksResultTitle: "Chunk Results",
+                    finalResultLabel: (total) => `Final Combined Result (${total} of ${total} chunks combined)`,
+                    chunkBoxLabel: (current, total) => `Chunk ${current} of ${total}`,
+                    uploadingChunkPrefix: (current, total) => `[Chunk ${current}/${total}] `
                 },
                 fa: {
                     pageTitle: "تبدیل محتوا به متن",
@@ -554,7 +989,6 @@
                     apiKeyLabel: "کلید API",
                     apiKeyPlaceholder: "کلید API خود را اینجا وارد کنید",
                     saveApiKeyBtn: "ذخیره و فعال‌سازی",
-                    fetchModelsBtn: "🔄 دریافت مدل‌ها",
                     uploadTitle: "۲. آپلود و تبدیل",
                     dropZoneClick: "برای آپلود کلیک کنید",
                     dropZoneOr: " یا فایل را بکشید و رها کنید",
@@ -573,19 +1007,25 @@
                     restoreBtnTooltip: "بازیابی آخرین نتیجه",
                     historyBtnTooltip: "تاریخچه",
                     resetAppBtnTooltip: "ریست کردن برنامه",
+                    expandBtnTooltip: "بزرگ‌نمایی باکس",
+                    expandModalTitle: "نمایش بزرگتر متن",
+                    collapseBtn: "کوچک‌نمایی",
                     outputPlaceholder: "متن تبدیل‌شده در اینجا نمایش داده می‌شود",
                     modalCloseBtn: "باشه",
                     removeFileBtn: "حذف",
                     translateTitle: "۴. ترجمه و قالب‌بندی",
-                    translateOutputTitle: "متن ترجمه شده",
+                    translateOutputTitle: "متن پردازش شده",
+                    translateModeLabel: "حالت عملکرد",
+                    modeBoth: "ترجمه و قالب‌بندی",
+                    modeTranslateOnly: "فقط ترجمه",
+                    modeFormatOnly: "فقط قالب‌بندی",
                     translateLangLabel: "ترجمه به",
-                    formatCheckboxLabel: "مرتب‌سازی و ساختاربندی متن",
-                    translateBtn: "ترجمه",
+                    translateBtn: "پردازش",
                     translateSourceLabel: "منبع ورودی",
                     sourceResultLabel: "از کادر نتیجه",
                     sourceManualLabel: "ورودی دستی",
-                    translateInputPlaceholder: "متن برای ترجمه را اینجا وارد کنید",
-                    translateOutputPlaceholder: "ترجمه در اینجا نمایش داده می‌شود",
+                    translateInputPlaceholder: "متن برای پردازش را اینجا وارد کنید",
+                    translateOutputPlaceholder: "نتیجه در اینجا نمایش داده می‌شود",
                     historyModalTitle: "تاریخچه تبدیل‌ها",
                     translateHistoryModalTitle: "تاریخچه ترجمه‌ها",
                     historyFileNameLabel: "فایل منبع:",
@@ -601,7 +1041,7 @@
                     msgApiKeyError: "لطفاً کلید API را وارد کنید.",
                     msgInvalidApiKeyError: "کلید API نامعتبر است یا منقضی شده. لطفاً آن را بررسی کرده و دوباره تلاش کنید.",
                     msgNoFile: "لطفاً ابتدا یک فایل را انتخاب کنید.",
-                    msgNoTextToTranslate: "متنی برای ترجمه وجود ندارد.",
+                    msgNoTextToTranslate: "متنی برای پردازش وجود ندارد.",
                     msgCopySuccess: "در کلیپ‌بورد کپی شد!",
                     msgCopyNoText: "متنی برای کپی کردن وجود ندارد",
                     msgResultCleared: "نتیجه پاک شد.",
@@ -613,7 +1053,7 @@
                     msgErrorTitle: "خطا",
                     msgAttentionTitle: "توجه",
                     msgConverting: "در حال تبدیل...",
-                    msgTranslating: "در حال ترجمه...",
+                    msgTranslating: "در حال پردازش...",
                     msgSelectedFile: "فایل انتخاب‌شده:",
                     msgClaudeAudioUnsupported: "API کلاد از تبدیل صوت/ویدیو پشتیبانی نمی‌کند. لطفاً یک فایل تصویر انتخاب کنید یا سرویس‌دهنده دیگری را امتحان کنید.",
                     msgUnknownError: "خطایی ناشناخته رخ داد. لطفاً دوباره تلاش کنید.",
@@ -622,11 +1062,32 @@
                     msgFetchModelsSuccess: "مدل‌ها با موفقیت بارگذاری شدند!",
                     msgFetchModelsError: "خطا در دریافت مدل‌ها. لطفاً کلید API را بررسی کنید.",
                     msgNoModelsFound: "هیچ مدلی برای این سرویس‌دهنده در دسترس نیست.",
+                    msgNoModelsYet: "کلید API خود را وارد کرده و روی «ذخیره و فعال‌سازی» کلیک کنید تا مدل‌ها بارگذاری شوند.",
                     msgFetchingModels: "در حال دریافت مدل‌ها...",
+                    msgCopyError: "کپی کردن متن با خطا مواجه شد.",
+                    msgUploading: (percent, uploaded, total, speed, eta) => `در حال آپلود: ${percent}% (${uploaded} از ${total} مگابایت) - سرعت: ${speed} MB/s | زمان باقی‌مانده: ${eta}`,
+                    msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است...",
+                    ffmpegTitle: "تنظیمات پردازش صوت/ویدیو با FFmpeg",
+                    chunkDurationLabel: "مدت‌زمان هر چانک (دقیقه)",
+                    chunk3min: "۳ دقیقه در هر چانک (پیشنهادی)",
+                    chunk5min: "۵ دقیقه در هر چانک",
+                    chunk10min: "۱۰ دقیقه در هر چانک",
+                    chunk15min: "۱۵ دقیقه در هر چانک",
+                    chunkDisabled: "غیرفعال (پردازش کل فایل)",
+                    bitrateLabel: "بیت‌ریت صدا (kbps)",
+                    bitrate128: "۱۲۸ kbps (پیشنهادی)",
+                    extractAudioLabel: "استخراج و فشرده‌سازی خودکار صدا (MP3)",
+                    msgFFmpegLoading: "در حال بارگذاری موتور FFmpeg WebAssembly در مرورگر...",
+                    msgFFmpegLoadError: "بارگذاری موتور FFmpeg در این مرورگر با خطا مواجه شد. مرورگر دیگری را امتحان کنید، افزونه‌ها را غیرفعال کنید یا گزینه چانک‌بندی را «غیرفعال» بگذارید.",
+                    msgCoiUnavailable: "قابلیت چانک‌بندی نیاز به هدرهای امنیتی خاصی داره که در حال حاضر روی این صفحه فعال نیستن (چانک‌بندی غیرفعال شد و کل فایل یکجا ارسال می‌شه).",
+                    msgFFmpegProcessing: (current, total) => `در حال برش فایل توسط FFmpeg: بخش ${current} از ${total}...`,
+                    msgProcessingChunk: (current, total) => `در حال تبدیل چانک ${current} از ${total} توسط هوش مصنوعی...`,
+                    chunksResultTitle: "نتایج هر چانک",
+                    finalResultLabel: (total) => `نتیجه نهایی و یکپارچه (ترکیب ${total} از ${total} چانک)`,
+                    chunkBoxLabel: (current, total) => `چانک ${current} از ${total}`,
+                    uploadingChunkPrefix: (current, total) => `[چانک ${current}/${total}] `
                 }
             };
-
-            // --- Function Definitions ---
 
             function setLanguage(lang) {
                 currentLang = lang;
@@ -653,15 +1114,33 @@
                 dom.html.classList.toggle('dark', theme === 'dark');
             }
 
-            function showMessage(titleKey, messageKey, isError = true, messageArgs) {
-                const title = translations[currentLang][titleKey];
-                let message = translations[currentLang][messageKey];
-                if (typeof message === 'function') message = message(messageArgs);
+            function showMessage(titleKey, messageKeyOrText, isError = true, messageArgs, isRawText = false) {
+                const title = translations[currentLang][titleKey] || titleKey;
+                let message;
+                if (isRawText) {
+                    message = messageKeyOrText;
+                } else {
+                    message = translations[currentLang][messageKeyOrText];
+                    if (typeof message === 'function') message = message(messageArgs);
+                    if (message === undefined) message = messageKeyOrText;
+                }
                 dom.modalTitle.textContent = title;
                 dom.modalMessage.textContent = message;
                 dom.modalTitle.classList.toggle('text-red-500', isError);
                 dom.modalTitle.classList.toggle('text-slate-800', !isError);
                 dom.modalTitle.classList.toggle('dark:text-white', !isError);
+
+                const wordCount = message.trim().split(/\s+/).length;
+                if (wordCount > 20) {
+                    dom.modalMsgContainer.className = "relative bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-left rtl:text-right overflow-y-auto max-h-[300px] my-2 group";
+                    dom.modalCopyBtn.classList.remove('hidden');
+                    dom.modalMessage.className = "text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap break-words pr-8 rtl:pr-0 rtl:pl-8";
+                } else {
+                    dom.modalMsgContainer.className = "my-4 text-center";
+                    dom.modalCopyBtn.classList.add('hidden');
+                    dom.modalMessage.className = "text-slate-600 dark:text-slate-300 text-base font-medium break-words";
+                }
+
                 dom.messageModal.classList.remove('hidden');
             }
 
@@ -678,14 +1157,9 @@
             function checkApiKey() {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiProvider = localStorage.getItem('apiProvider');
-                const apiModel = localStorage.getItem('apiModel');
                 if (apiKey && apiProvider) {
                     dom.apiKeyInput.value = apiKey;
-                    dom.apiProviderSelect.value = apiProvider;
-                    if (apiModel) {
-                        // مدل در populateModelSelect تنظیم خواهد شد
-                    }
-                    dom.mainAppWrapper.classList.remove('disabled-section');
+                    setCustomDropdownValue('api-provider-dropdown', apiProvider);
                 }
             }
 
@@ -693,20 +1167,46 @@
                 selectedFile = null;
                 dom.fileInput.value = '';
                 dom.filePreview.innerHTML = '';
+                dom.dropZone.classList.remove('hidden');
+                dom.ffmpegSettings.classList.add('hidden');
+            }
+
+            function isChunkingSupported() {
+                return typeof SharedArrayBuffer !== 'undefined' && window.crossOriginIsolated === true;
+            }
+
+            function applyChunkingAvailability() {
+                const supported = isChunkingSupported();
+                dom.ffmpegCoiWarning.classList.toggle('hidden', supported);
+                const durationDropdown = document.getElementById('chunk-duration-dropdown');
+                const bitrateDropdown = document.getElementById('chunk-bitrate-dropdown');
+                [durationDropdown, bitrateDropdown].forEach(el => {
+                    el.classList.toggle('opacity-50', !supported);
+                    el.classList.toggle('pointer-events-none', !supported);
+                });
+                if (!supported) {
+                    setCustomDropdownValue('chunk-duration-dropdown', '0');
+                }
             }
 
             function handleFile(file) {
                 resetUpload();
                 selectedFile = file;
+
+                dom.dropZone.classList.add('hidden');
+
                 const fileType = file.type.split('/')[0];
                 let previewElement;
                 if (fileType === 'image') {
                     previewElement = document.createElement('img');
                     previewElement.className = 'max-w-full h-auto max-h-48 rounded-lg mx-auto';
+                    dom.ffmpegSettings.classList.add('hidden');
                 } else if (fileType === 'audio' || fileType === 'video') {
                     previewElement = document.createElement(fileType);
                     previewElement.controls = true;
                     previewElement.className = `w-full ${fileType === 'audio' ? 'max-w-md' : 'max-h-48'} mx-auto rounded-lg`;
+                    dom.ffmpegSettings.classList.remove('hidden');
+                    applyChunkingAvailability();
                 }
                 if (previewElement) {
                     previewElement.src = URL.createObjectURL(file);
@@ -718,13 +1218,106 @@
                     const removeBtn = document.createElement('button');
                     removeBtn.innerHTML = `<iconify-icon icon="mdi:close" width="20" height="20"></iconify-icon>`;
                     removeBtn.title = translations[currentLang].removeFileBtn;
-                    removeBtn.className = 'absolute top-1 right-1 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors';
+                    removeBtn.className = 'absolute top-1 right-1 text-slate-500 hover:text-red-500 transition-colors';
                     removeBtn.onclick = resetUpload;
                     container.appendChild(fileNameElement);
                     container.appendChild(previewElement);
                     container.appendChild(removeBtn);
                     dom.filePreview.appendChild(container);
                 }
+            }
+
+            function getFileDuration(file) {
+                return new Promise((resolve) => {
+                    const media = document.createElement(file.type.startsWith('video') ? 'video' : 'audio');
+                    media.preload = 'metadata';
+                    media.onloadedmetadata = () => {
+                        window.URL.revokeObjectURL(media.src);
+                        resolve(media.duration);
+                    };
+                    media.onerror = () => resolve(0);
+                    media.src = URL.createObjectURL(file);
+                });
+            }
+
+            // Pinned to the single-threaded 0.11.0 core build. The "latest" alias can resolve to
+            // a multi-thread build that requires SharedArrayBuffer, which is unavailable without
+            // cross-origin-isolation (COOP/COEP) headers on this page ("SharedArrayBuffer is not
+            // defined"). Multiple CDN mirrors are tried in case one is unreliable/blocked.
+            const FFMPEG_CORE_SOURCES = [
+                'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+                'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+            ];
+
+            async function loadFFmpeg() {
+                if (ffmpeg !== null && ffmpeg.isLoaded && ffmpeg.isLoaded()) return;
+
+                if (!isChunkingSupported()) {
+                    throw new Error(translations[currentLang].msgCoiUnavailable);
+                }
+
+                dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegLoading;
+
+                let lastError = null;
+                for (const corePath of FFMPEG_CORE_SOURCES) {
+                    try {
+                        const candidate = createFFmpeg({ log: false, corePath });
+                        await candidate.load();
+                        ffmpeg = candidate;
+                        return;
+                    } catch (err) {
+                        console.error(`FFmpeg load error (core: ${corePath}):`, err);
+                        lastError = err;
+                    }
+                }
+
+                ffmpeg = null;
+                const detail = lastError?.message || String(lastError);
+                throw new Error(`${translations[currentLang].msgFFmpegLoadError}\n\n(${detail})`);
+            }
+
+            async function sliceAudioFileFFmpeg(file, chunkDuration, bitrateKbps) {
+                await loadFFmpeg();
+
+                const duration = await getFileDuration(file);
+                if (!duration || duration <= chunkDuration) {
+                    return [file]; // Return as single file if short
+                }
+
+                const ext = 'mp3';
+                const inputName = `input_${Date.now()}.${file.name.split('.').pop()}`;
+                ffmpeg.FS('writeFile', inputName, await fetchFile(file));
+
+                const chunks = [];
+                const totalChunks = Math.ceil(duration / chunkDuration);
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const startTime = i * chunkDuration;
+                    const outputName = `chunk_${i}.${ext}`;
+
+                    dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegProcessing(i + 1, totalChunks);
+
+                    // FFmpeg command to slice audio without re-encoding video
+                    await ffmpeg.run(
+                        '-ss', startTime.toString(),
+                        '-i', inputName,
+                        '-t', chunkDuration.toString(),
+                        '-vn', // Disable Video
+                        '-acodec', 'libmp3lame',
+                        '-b:a', `${bitrateKbps || 128}k`,
+                        outputName
+                    );
+
+                    const data = ffmpeg.FS('readFile', outputName);
+                    const chunkBlob = new Blob([data.buffer], { type: 'audio/mp3' });
+                    const chunkFile = new File([chunkBlob], `part_${i + 1}.mp3`, { type: 'audio/mp3' });
+                    chunks.push(chunkFile);
+
+                    ffmpeg.FS('unlink', outputName);
+                }
+
+                ffmpeg.FS('unlink', inputName);
+                return chunks;
             }
 
             function fileToBase64(file) {
@@ -746,140 +1339,208 @@
                         return currentLang === 'fa' ? `محتوای فایل زیر را آوانویسی کن. فرض کن زبان محتوا ${languageName} است. ترجمه نکن، فقط هرچه میشنوی یا میبینی را به زبان ${languageName} بنویس.` : `Transcribe the content of the file below. Assume the language is ${languageName}. Do not translate; only write what you hear or see in the ${languageName} language.`;
                     }
                 } else if (task === 'translate') {
-                    const targetLanguage = dom.translateLangSelect.options[dom.translateLangSelect.selectedIndex].text;
-                    const formatText = dom.formatCheckbox.checked ? (currentLang === 'fa' ? " متن را مرتب و پاراگراف بندی کن." : " Format and structure the text with proper paragraphing.") : "";
-                    return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن.${formatText}` : `Translate the following text to ${targetLanguage}.${formatText}`);
-                }
-            }
+                    const mode = dom.translateModeSelect.value;
+                    const targetLanguage = document.querySelector(`#translate-language-select option[value="${dom.translateLangSelect.value}"]`)?.textContent || "Persian";
 
-            async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        if (response.ok) return response;
-                        const isRetryableStatus = [429, 500, 502, 503, 504].includes(response.status);
-                        let errorData;
-                        try {
-                            errorData = await response.json();
-                        } catch (e) {
-                            errorData = { error: { message: response.statusText } };
-                        }
-                        const errorMessage = errorData.error?.message || '';
-                        const isOverloaded = errorMessage.toLowerCase().includes('overloaded') || errorMessage.toLowerCase().includes('try again');
-                        if (!isRetryableStatus && !isOverloaded) {
-                            throw new Error(errorMessage || `HTTP Error: ${response.status}`);
-                        }
-                        if (i === retries - 1) {
-                            throw new Error(errorMessage || `API is overloaded. Please try again later.`);
-                        }
-                        const delay = backoff * Math.pow(2, i);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } catch (error) {
-                        if (i === retries - 1) throw error;
-                        const delay = backoff * Math.pow(2, i);
-                        await new Promise(resolve => setTimeout(resolve, delay));
+                    if (mode === 'both') {
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن و متن را کاملاً مرتب، پاراگراف‌بندی و ساختاربندی کن.` : `Translate the following text to ${targetLanguage} and format/structure the text with proper paragraphing.`);
+                    } else if (mode === 'translate') {
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن. ساختار اصلی متن را تغییر نده.` : `Translate the following text to ${targetLanguage}. Keep the original structure as is.`);
+                    } else if (mode === 'format') {
+                        return (currentLang === 'fa' ? `متن زیر را فقط مرتب، ویرایش و پاراگراف‌بندی کن. زبان متن را تغییر نده.` : `Format, clean up, and structure the following text into proper paragraphs. Do not change the language.`);
                     }
                 }
             }
 
+            function updateProcessButtonIcon() {
+                const mode = dom.translateModeSelect.value;
+                const iconElem = dom.translateIcon;
+                if (mode === 'both') {
+                    iconElem.setAttribute('icon', 'mdi:translate');
+                } else if (mode === 'translate') {
+                    iconElem.setAttribute('icon', 'mdi:earth');
+                } else if (mode === 'format') {
+                    iconElem.setAttribute('icon', 'mdi:format-align-left');
+                }
+            }
+
+            function xhrRequest({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open(method, url);
+                    xhr.timeout = 0;
+
+                    Object.keys(headers).forEach(key => {
+                        xhr.setRequestHeader(key, headers[key]);
+                    });
+
+                    let startTime = Date.now();
+
+                    if (xhr.upload && onUploadProgress) {
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const now = Date.now();
+                                const timeDiff = (now - startTime) / 1000;
+                                const speedBytesPerSec = timeDiff > 0 ? (e.loaded / timeDiff) : 0;
+                                const speedMBps = (speedBytesPerSec / (1024 * 1024)).toFixed(2);
+                                const percent = Math.round((e.loaded / e.total) * 100);
+                                const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+                                const totalMB = (e.total / (1024 * 1024)).toFixed(2);
+
+                                const remainingBytes = e.total - e.loaded;
+                                let etaSec = speedBytesPerSec > 0 ? Math.ceil(remainingBytes / speedBytesPerSec) : 0;
+                                let etaFormatted = "0s";
+                                if (etaSec >= 60) {
+                                    const mins = Math.floor(etaSec / 60);
+                                    const secs = etaSec % 60;
+                                    etaFormatted = `${mins}m ${secs}s`;
+                                } else {
+                                    etaFormatted = `${etaSec}s`;
+                                }
+
+                                onUploadProgress({ percent, uploadedMB, totalMB, speedMBps, eta: etaFormatted });
+                            }
+                        };
+                    }
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                resolve(JSON.parse(xhr.responseText));
+                            } catch (e) {
+                                resolve(xhr.responseText);
+                            }
+                        } else {
+                            let errorMsg = xhr.statusText;
+                            try {
+                                const errData = JSON.parse(xhr.responseText);
+                                errorMsg = errData.error?.message || errorMsg;
+                            } catch (e) { }
+                            reject(new Error(errorMsg || `HTTP Error: ${xhr.status}`));
+                        }
+                    };
+
+                    xhr.onerror = () => reject(new Error('Network error occurred.'));
+                    xhr.send(body);
+                });
+            }
+
+            function getModelPurposeInfo(modelId, provider) {
+                const id = modelId.toLowerCase();
+                if (provider === 'gemini') {
+                    if (id.includes('flash-8b')) return { category: 'Fastest', tag: 'Fast / Efficient' };
+                    if (id.includes('flash')) return { category: 'Multimodal', tag: 'Fast / Multimodal' };
+                    if (id.includes('pro')) return { category: 'Reasoning', tag: 'Heavy Reasoning' };
+                } else if (provider === 'openai') {
+                    if (id.includes('whisper')) return { category: 'Audio', tag: 'Dedicated Audio' };
+                    if (id.includes('gpt-4o-mini')) return { category: 'Fast Multimodal', tag: 'Fast Vision/Text' };
+                    if (id.includes('gpt-4o')) return { category: 'Multimodal', tag: 'Precision Multimodal' };
+                    if (id.includes('turbo')) return { category: 'Vision/Text', tag: 'Text & Vision' };
+                } else if (provider === 'claude') {
+                    if (id.includes('haiku')) return { category: 'Fast', tag: 'Fast Text/Vision' };
+                    if (id.includes('sonnet')) return { category: 'Balanced', tag: 'Balanced Analysis' };
+                    if (id.includes('opus')) return { category: 'Reasoning', tag: 'Deep Reasoning' };
+                }
+                return { category: 'General', tag: 'General AI' };
+            }
+
             async function fetchAvailableModels(provider, apiKey) {
                 try {
+                    let models = [];
                     switch (provider) {
                         case 'gemini': {
                             const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
                             const response = await fetch(url);
                             if (!response.ok) throw new Error('Failed to fetch Gemini models');
                             const data = await response.json();
-                            // فیلتر کردن مدل‌هایی که از generateContent پشتیبانی می‌کنند
-                            return data.models
+                            models = data.models
                                 .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
-                                .map(model => ({
-                                    id: model.name.replace('models/', ''),
-                                    displayName: model.displayName || model.name.replace('models/', ''),
-                                    description: model.description || ''
-                                }));
+                                .map(model => {
+                                    const mId = model.name.replace('models/', '');
+                                    const info = getModelPurposeInfo(mId, 'gemini');
+                                    return { id: mId, rawName: model.displayName || mId, category: info.category, tag: info.tag };
+                                });
+                            break;
                         }
                         case 'openai': {
                             const url = 'https://api.openai.com/v1/models';
-                            const response = await fetch(url, {
-                                headers: { 'Authorization': `Bearer ${apiKey}` }
-                            });
+                            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
                             if (!response.ok) throw new Error('Failed to fetch OpenAI models');
                             const data = await response.json();
-                            // فیلتر کردن مدل‌های مفید برای تبدیل متن
-                            const usefulModels = ['gpt-4', 'gpt-4-turbo', 'gpt-4-vision-preview', 'gpt-3.5-turbo', 'whisper-1'];
-                            return data.data
+                            const usefulModels = ['gpt-4', 'gpt-4-turbo', 'gpt-4o', 'gpt-3.5-turbo', 'whisper-1'];
+                            models = data.data
                                 .filter(model => usefulModels.some(um => model.id.includes(um)))
-                                .map(model => ({
-                                    id: model.id,
-                                    displayName: model.id,
-                                    description: model.object
-                                }));
+                                .map(model => {
+                                    const info = getModelPurposeInfo(model.id, 'openai');
+                                    return { id: model.id, rawName: model.id, category: info.category, tag: info.tag };
+                                });
+                            break;
                         }
                         case 'claude': {
-                            // Claude مدل‌های ثابتی دارد که می‌توانیم لیست کنیم
-                            const claudeModels = [
-                                { id: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus', description: 'Most powerful' },
-                                { id: 'claude-3-sonnet-20240229', displayName: 'Claude 3 Sonnet', description: 'Balanced' },
-                                { id: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku', description: 'Fastest' }
-                            ];
-                            return claudeModels;
+                            const url = 'https://api.anthropic.com/v1/models?limit=1000';
+                            const response = await fetch(url, {
+                                headers: {
+                                    'x-api-key': apiKey,
+                                    'anthropic-version': '2023-06-01',
+                                    'anthropic-dangerous-direct-browser-access': 'true'
+                                }
+                            });
+                            if (!response.ok) throw new Error('Failed to fetch Claude models');
+                            const data = await response.json();
+                            models = (data.data || []).map(model => {
+                                const mId = model.id;
+                                const info = getModelPurposeInfo(mId, 'claude');
+                                return { id: mId, rawName: model.display_name || mId, category: info.category, tag: info.tag };
+                            });
+                            break;
                         }
-                        default:
-                            throw new Error('Unsupported provider');
                     }
+
+                    return models.sort((a, b) => a.rawName.localeCompare(b.rawName));
                 } catch (error) {
                     console.error('Error fetching models:', error);
                     throw error;
                 }
             }
 
-            function getDefaultModels(provider) {
-                switch (provider) {
-                    case 'gemini':
-                        return [
-                            { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', description: 'Latest Flash model' },
-                            { id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', description: 'Most capable' },
-                            { id: 'gemini-2.0-flash-lite', displayName: 'Gemini 2.0 Flash Lite', description: 'Lightweight' }
-                        ];
-                    case 'openai':
-                        return [
-                            { id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo', description: 'Most capable' },
-                            { id: 'gpt-4', displayName: 'GPT-4', description: 'Balanced' },
-                            { id: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo', description: 'Fast' }
-                        ];
-                    case 'claude':
-                        return [
-                            { id: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus', description: 'Most powerful' },
-                            { id: 'claude-3-sonnet-20240229', displayName: 'Claude 3 Sonnet', description: 'Balanced' },
-                            { id: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku', description: 'Fastest' }
-                        ];
-                    default:
-                        return [];
-                }
-            }
-
             function populateModelSelect(models, selectedModel = null) {
                 const modelSelect = dom.apiModelSelect;
+                const modelMenu = document.querySelector('#api-model-dropdown .custom-dropdown-menu');
                 modelSelect.innerHTML = '';
+                modelMenu.innerHTML = '';
 
                 if (!models || models.length === 0) {
-                    const option = document.createElement('option');
-                    option.value = '';
-                    option.textContent = translations[currentLang].msgNoModelsFound;
-                    modelSelect.appendChild(option);
+                    dom.modelSelectWrapper.classList.add('hidden');
+                    dom.mainAppWrapper.classList.add('disabled-section');
                     return;
                 }
 
-                models.forEach(model => {
+                models.forEach((model, index) => {
                     const option = document.createElement('option');
                     option.value = model.id;
-                    option.textContent = `${model.displayName}${model.description ? ` - ${model.description}` : ''}`;
-                    if (selectedModel && model.id === selectedModel) {
+                    option.textContent = model.rawName;
+
+                    const item = document.createElement('div');
+                    item.className = 'custom-dropdown-item';
+                    item.setAttribute('data-value', model.id);
+                    item.innerHTML = `<span class="model-name-text truncate">${model.rawName}</span><span class="model-tag-badge">${model.tag}</span>`;
+
+                    if ((selectedModel && model.id === selectedModel) || (!selectedModel && index === 0)) {
                         option.selected = true;
+                        item.classList.add('selected');
+                        document.querySelector('#api-model-dropdown .selected-text').textContent = model.rawName;
                     }
+
                     modelSelect.appendChild(option);
+                    modelMenu.appendChild(item);
                 });
+
+                if (!localStorage.getItem('apiModel') && models.length > 0) {
+                    localStorage.setItem('apiModel', models[0].id);
+                }
+
+                dom.modelSelectWrapper.classList.remove('hidden');
+                dom.mainAppWrapper.classList.remove('disabled-section');
             }
 
             async function fetchAndPopulateModels(provider, apiKey) {
@@ -890,68 +1551,187 @@
                     populateModelSelect(models, savedModel);
                     showToast('msgFetchModelsSuccess');
                 } catch (error) {
-                    console.error('Error fetching models:', error);
+                    populateModelSelect([]);
                     showMessage('msgErrorTitle', 'msgFetchModelsError');
-                    // در صورت خطا، مدل‌های پیش‌فرض را نمایش بده
-                    const defaultModels = getDefaultModels(provider);
-                    populateModelSelect(defaultModels);
                 }
             }
 
-            async function callGeminiAPI(prompt, textInput = null) {
+            let currentChunkInfo = null; // { current, total } while chunked upload is in progress
+
+            function updateProgressUI(info) {
+                const chunkPrefix = currentChunkInfo
+                    ? translations[currentLang].uploadingChunkPrefix(currentChunkInfo.current, currentChunkInfo.total)
+                    : '';
+                if (info.percent < 100) {
+                    dom.progressSvg.classList.remove('hidden');
+                    dom.infiniteSpinner.classList.add('hidden');
+                    dom.progressCirclePath.setAttribute('stroke-dasharray', `${info.percent}, 100`);
+
+                    const progressText = translations[currentLang].msgUploading(
+                        info.percent, info.uploadedMB, info.totalMB, info.speedMBps, info.eta
+                    );
+                    dom.resultLoaderText.textContent = chunkPrefix + progressText;
+                } else {
+                    dom.progressSvg.classList.add('hidden');
+                    dom.infiniteSpinner.classList.remove('hidden');
+                    dom.resultLoaderText.textContent = chunkPrefix + translations[currentLang].msgProcessingModel;
+                }
+            }
+
+            function resetChunkResults() {
+                dom.chunksOutputList.innerHTML = '';
+                dom.chunksOutputWrapper.classList.add('hidden');
+                dom.chunksOutputWrapper.open = true;
+                dom.finalResultLabel.classList.add('hidden');
+            }
+
+            function addChunkResultBox(current, total, text) {
+                dom.chunksOutputWrapper.classList.remove('hidden');
+                const box = document.createElement('div');
+                box.className = 'min-h-[200px] flex flex-col bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-3';
+
+                const header = document.createElement('div');
+                header.className = 'flex justify-between items-center mb-1.5 flex-shrink-0';
+                const title = document.createElement('span');
+                title.className = 'text-xs font-semibold text-sky-600 dark:text-sky-400';
+                title.textContent = translations[currentLang].chunkBoxLabel(current, total);
+                const copyBtn = document.createElement('button');
+                copyBtn.innerHTML = `<iconify-icon icon="mdi:content-copy" width="16" height="16"></iconify-icon>`;
+                copyBtn.className = 'inline-flex items-center justify-center text-slate-500 hover:text-sky-500';
+                copyBtn.onclick = () => copyTextToClipboard(text);
+                header.appendChild(title);
+                header.appendChild(copyBtn);
+
+                const body = document.createElement('p');
+                body.className = 'flex-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap overflow-y-auto';
+                body.textContent = text;
+
+                box.appendChild(header);
+                box.appendChild(body);
+                dom.chunksOutputList.appendChild(box);
+            }
+
+            async function callGeminiAPI(prompt, file, textInput = null) {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiModel = localStorage.getItem('apiModel') || 'gemini-2.5-flash';
+
+                if (!textInput && file.size > 20 * 1024 * 1024) {
+                    const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
+                    const initRes = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Protocol': 'resumable',
+                            'X-Goog-Upload-Command': 'start',
+                            'X-Goog-Upload-Header-Content-Length': file.size,
+                            'X-Goog-Upload-Header-Content-Type': file.type,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ file: { display_name: file.name } })
+                    });
+
+                    const resUrl = initRes.headers.get('X-Goog-Upload-URL');
+                    if (!resUrl) throw new Error('Could not initiate file upload for large file.');
+
+                    const fileData = await xhrRequest({
+                        url: resUrl,
+                        method: 'POST',
+                        headers: {
+                            'X-Goog-Upload-Offset': '0',
+                            'X-Goog-Upload-Command': 'upload, finalize'
+                        },
+                        body: file,
+                        onUploadProgress: (info) => updateProgressUI(info)
+                    });
+
+                    const fileUri = fileData.file.uri;
+                    const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
+                    const payload = { contents: [{ parts: [{ text: prompt }, { file_data: { mime_type: file.type, file_uri: fileUri } }] }] };
+
+                    const data = await xhrRequest({
+                        url: genUrl,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (data.error) throw new Error(data.error.message);
+                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
+                    throw new Error(translations[currentLang].msgNoTextReturned);
+                }
+
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
                 let parts = [{ text: prompt }];
                 if (textInput) {
                     parts.push({ text: textInput });
                 } else {
-                    const base64Data = await fileToBase64(selectedFile);
-                    parts.push({ inline_data: { mime_type: selectedFile.type, data: base64Data } });
+                    const base64Data = await fileToBase64(file);
+                    parts.push({ inline_data: { mime_type: file.type, data: base64Data } });
                 }
-                const payload = { contents: [{ parts }] };
-                const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await response.json();
+
+                const data = await xhrRequest({
+                    url,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] }),
+                    onUploadProgress: (info) => !textInput && updateProgressUI(info)
+                });
+
+                if (data.error) throw new Error(data.error.message);
                 if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
-                if (data.candidates?.[0]?.finishReason !== 'STOP') throw new Error(translations[currentLang].msgModelStopped(data.candidates[0].finishReason));
-                return translations[currentLang].msgNoTextReturned;
+                throw new Error(translations[currentLang].msgNoTextReturned);
             }
 
-            async function callOpenAIAPI(prompt, textInput = null) {
+            async function callOpenAIAPI(prompt, file, textInput = null) {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiModel = localStorage.getItem('apiModel') || 'gpt-4-turbo';
 
                 if (textInput) {
                     const url = 'https://api.openai.com/v1/chat/completions';
                     const payload = { model: apiModel, messages: [{ role: "system", content: prompt }, { role: "user", content: textInput }] };
-                    const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
-                    const data = await response.json();
+                    const data = await xhrRequest({
+                        url,
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify(payload)
+                    });
+                    if (data.error) throw new Error(data.error.message);
                     return data.choices[0].message.content;
                 } else {
-                    const fileType = selectedFile.type.split('/')[0];
+                    const fileType = file.type.split('/')[0];
                     if (fileType === 'audio' || fileType === 'video') {
                         const url = 'https://api.openai.com/v1/audio/transcriptions';
                         const formData = new FormData();
-                        formData.append('file', selectedFile);
+                        formData.append('file', file);
                         formData.append('model', 'whisper-1');
                         const language = document.getElementById('language-select').value;
                         if (language !== 'auto') formData.append('language', language);
-                        const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Authorization': `Bearer ${apiKey}` }, body: formData });
-                        const data = await response.json();
+
+                        const data = await xhrRequest({
+                            url,
+                            headers: { 'Authorization': `Bearer ${apiKey}` },
+                            body: formData,
+                            onUploadProgress: (info) => updateProgressUI(info)
+                        });
+
+                        if (data.error) throw new Error(data.error.message);
                         return data.text;
                     } else {
-                        const model = apiModel.includes('vision') ? apiModel : 'gpt-4-vision-preview';
+                        const model = apiModel.includes('vision') || apiModel.includes('4o') ? apiModel : 'gpt-4o';
                         const url = 'https://api.openai.com/v1/chat/completions';
-                        const base64Data = await fileToBase64(selectedFile);
-                        const payload = { model: model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${selectedFile.type};base64,${base64Data}` } }] }], max_tokens: 1000 };
-                        const response = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify(payload) });
-                        const data = await response.json();
+                        const base64Data = await fileToBase64(file);
+                        const payload = { model: model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${file.type};base64,${base64Data}` } }] }], max_tokens: 1000 };
+
+                        const data = await xhrRequest({
+                            url,
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                            body: JSON.stringify(payload),
+                            onUploadProgress: (info) => updateProgressUI(info)
+                        });
+
+                        if (data.error) throw new Error(data.error.message);
                         return data.choices[0].message.content;
                     }
                 }
             }
 
-            async function callClaudeAPI(prompt, textInput = null) {
+            async function callClaudeAPI(prompt, file, textInput = null) {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiModel = localStorage.getItem('apiModel') || 'claude-3-opus-20240229';
                 const url = 'https://api.anthropic.com/v1/messages';
@@ -959,23 +1739,29 @@
                 if (textInput) {
                     content.push({ type: "text", text: `${prompt}\n\n${textInput}` });
                 } else {
-                    if (selectedFile.type.split('/')[0] !== 'image') throw new Error(translations[currentLang].msgClaudeAudioUnsupported);
-                    const base64Data = await fileToBase64(selectedFile);
-                    content.push({ type: "image", source: { type: "base64", media_type: selectedFile.type, data: base64Data } });
+                    if (file.type.split('/')[0] !== 'image') throw new Error(translations[currentLang].msgClaudeAudioUnsupported);
+                    const base64Data = await fileToBase64(file);
+                    content.push({ type: "image", source: { type: "base64", media_type: file.type, data: base64Data } });
                     content.push({ type: "text", text: prompt });
                 }
-                const payload = { model: apiModel, max_tokens: 2048, messages: [{ role: "user", content }] };
-                const response = await fetchWithRetry(url, { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await response.json();
+
+                const data = await xhrRequest({
+                    url,
+                    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+                    body: JSON.stringify({ model: apiModel, max_tokens: 2048, messages: [{ role: "user", content }] }),
+                    onUploadProgress: (info) => !textInput && updateProgressUI(info)
+                });
+
+                if (data.error) throw new Error(data.error.message);
                 return data.content[0].text;
             }
 
-            async function callGenericAPI(prompt, textInput) {
+            async function callGenericAPI(prompt, file, textInput = null) {
                 const provider = localStorage.getItem('apiProvider');
                 switch (provider) {
-                    case 'gemini': return await callGeminiAPI(prompt, textInput);
-                    case 'openai': return await callOpenAIAPI(prompt, textInput);
-                    case 'claude': return await callClaudeAPI(prompt, textInput);
+                    case 'gemini': return await callGeminiAPI(prompt, file, textInput);
+                    case 'openai': return await callOpenAIAPI(prompt, file, textInput);
+                    case 'claude': return await callClaudeAPI(prompt, file, textInput);
                     default: throw new Error('Invalid API provider selected.');
                 }
             }
@@ -988,7 +1774,13 @@
                 btn.disabled = true;
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'msgTranslating' : 'msgConverting'];
                 if (!isTranslate) {
-                    btn.querySelector('iconify-icon').classList.add('animate-spin');
+                    dom.convertIcon.classList.remove('hidden');
+                    dom.convertIcon.classList.add('animate-spin');
+                    dom.progressSvg.classList.add('hidden');
+                    dom.infiniteSpinner.classList.remove('hidden');
+                    dom.resultLoaderText.textContent = '';
+                } else {
+                    dom.translateIcon.classList.add('animate-spin');
                 }
                 placeholder.classList.add('hidden');
                 outputArea.classList.add('hidden');
@@ -1002,7 +1794,10 @@
                 btn.disabled = false;
                 btn.querySelector('span').textContent = translations[currentLang][isTranslate ? 'translateBtn' : 'convertBtn'];
                 if (!isTranslate) {
-                    btn.querySelector('iconify-icon').classList.remove('animate-spin');
+                    dom.convertIcon.classList.remove('animate-spin');
+                    dom.convertIcon.classList.add('hidden');
+                } else {
+                    dom.translateIcon.classList.remove('animate-spin');
                 }
                 loader.classList.add('hidden');
                 outputArea.classList.remove('hidden');
@@ -1017,17 +1812,40 @@
                 textArea.value = text;
                 textArea.style.position = 'fixed';
                 textArea.style.top = '-9999px';
-                textArea.style.left = '-9999px';
                 document.body.appendChild(textArea);
-                textArea.focus();
                 textArea.select();
                 try {
                     document.execCommand('copy');
                     showToast('msgCopySuccess');
                 } catch (err) {
-                    showMessage('msgErrorTitle', 'msgCopyError');
+                    showMessage('msgErrorTitle', 'msgCopyError', true);
                 }
                 document.body.removeChild(textArea);
+            }
+
+            function openExpandModal(targetTextArea) {
+                if (!targetTextArea) return;
+                activeExpandedTextArea = targetTextArea;
+                dom.expandTextArea.value = targetTextArea.value;
+                dom.expandTextArea.dir = targetTextArea.dir || (currentLang === 'fa' ? 'rtl' : 'ltr');
+                dom.expandTextArea.style.textAlign = targetTextArea.style.textAlign || 'left';
+                dom.expandModal.classList.remove('hidden');
+            }
+
+            function closeExpandModal() {
+                if (activeExpandedTextArea) {
+                    activeExpandedTextArea.value = dom.expandTextArea.value;
+                    activeExpandedTextArea.style.textAlign = dom.expandTextArea.style.textAlign;
+                    activeExpandedTextArea.dir = dom.expandTextArea.dir;
+                }
+                dom.expandModal.classList.add('hidden');
+                activeExpandedTextArea = null;
+            }
+
+            function setExpandAlign(align) {
+                dom.expandTextArea.style.textAlign = align;
+                if (align === 'right') dom.expandTextArea.dir = 'rtl';
+                else if (align === 'left') dom.expandTextArea.dir = 'ltr';
             }
 
             function saveHistory(type) {
@@ -1111,7 +1929,7 @@
                     };
                     mainControls.appendChild(deleteBtn);
 
-                    const createSection = (titleKey, text, copyable = true) => {
+                    const createSection = (titleKey, text) => {
                         const sectionDiv = document.createElement('div');
                         const header = document.createElement('div');
                         header.className = 'flex justify-between items-center mb-1';
@@ -1119,13 +1937,11 @@
                         title.className = 'text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2';
                         title.textContent = translations[currentLang][titleKey];
                         header.appendChild(title);
-                        if (copyable) {
-                            const copyBtn = document.createElement('button');
-                            copyBtn.innerHTML = `<iconify-icon icon="mdi:content-copy" width="16" height="16"></iconify-icon>`;
-                            copyBtn.className = 'text-slate-500 hover:text-sky-500';
-                            copyBtn.onclick = () => copyTextToClipboard(text);
-                            header.appendChild(copyBtn);
-                        }
+                        const copyBtn = document.createElement('button');
+                        copyBtn.innerHTML = `<iconify-icon icon="mdi:content-copy" width="16" height="16"></iconify-icon>`;
+                        copyBtn.className = 'text-slate-500 hover:text-sky-500';
+                        copyBtn.onclick = () => copyTextToClipboard(text);
+                        header.appendChild(copyBtn);
                         sectionDiv.appendChild(header);
                         const content = document.createElement('p');
                         content.className = 'text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap max-h-20 overflow-y-auto bg-white dark:bg-slate-800 p-2 rounded';
@@ -1134,19 +1950,9 @@
                         return sectionDiv;
                     };
 
-                    const inputSection = createSection('translationHistoryInput', item.input);
-                    const outputSection = createSection('translationHistoryOutput', item.output);
-
-                    if (item.formatted) {
-                        const formattedBadge = document.createElement('span');
-                        formattedBadge.className = 'text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300 px-2 py-0.5 rounded-full';
-                        formattedBadge.textContent = translations[currentLang].translationHistoryFormatted;
-                        inputSection.querySelector('h4').appendChild(formattedBadge);
-                    }
-
                     itemDiv.appendChild(mainControls);
-                    itemDiv.appendChild(inputSection);
-                    itemDiv.appendChild(outputSection);
+                    itemDiv.appendChild(createSection('translationHistoryInput', item.input));
+                    itemDiv.appendChild(createSection('translationHistoryOutput', item.output));
                     dom.translateHistoryList.appendChild(itemDiv);
                 });
             }
@@ -1158,66 +1964,51 @@
                 setLanguage(savedLang);
                 checkApiKey();
                 loadHistory();
+                updateProcessButtonIcon();
 
-                // بارگذاری مدل ذخیره‌شده
-                const savedModel = localStorage.getItem('apiModel');
+                initCustomDropdown('api-provider-dropdown', (value) => {
+                    const apiKey = localStorage.getItem('apiKey');
+                    if (apiKey) fetchAndPopulateModels(value, apiKey);
+                    else populateModelSelect([]);
+                });
+                initCustomDropdown('api-model-dropdown', (value) => {
+                    if (value) localStorage.setItem('apiModel', value);
+                });
+                initCustomDropdown('language-select-dropdown');
+                initCustomDropdown('chunk-duration-dropdown');
+                initCustomDropdown('chunk-bitrate-dropdown');
+                initCustomDropdown('translate-mode-dropdown', (value) => {
+                    updateProcessButtonIcon();
+                    if (value === 'format') {
+                        dom.targetLangWrapper.classList.add('hidden');
+                    } else {
+                        dom.targetLangWrapper.classList.remove('hidden');
+                    }
+                });
+                initCustomDropdown('translate-language-dropdown');
+
                 const savedProvider = localStorage.getItem('apiProvider');
                 const savedApiKey = localStorage.getItem('apiKey');
 
                 if (savedApiKey && savedProvider) {
                     fetchAndPopulateModels(savedProvider, savedApiKey);
                 } else {
-                    // نمایش مدل‌های پیش‌فرض برای provider انتخاب‌شده
-                    const provider = dom.apiProviderSelect.value;
-                    const defaultModels = getDefaultModels(provider);
-                    populateModelSelect(defaultModels, savedModel);
+                    populateModelSelect([]);
                 }
 
-                // Attach all event listeners
                 dom.saveApiKeyBtn.addEventListener('click', () => {
                     const apiKey = dom.apiKeyInput.value.trim();
                     const apiProvider = dom.apiProviderSelect.value;
-                    const apiModel = dom.apiModelSelect.value;
 
                     if (apiKey) {
                         localStorage.setItem('apiKey', apiKey);
                         localStorage.setItem('apiProvider', apiProvider);
-                        if (apiModel) {
-                            localStorage.setItem('apiModel', apiModel);
-                        }
-                        dom.mainAppWrapper.classList.remove('disabled-section');
                         showToast('msgApiKeySuccess');
-
-                        // اگر مدلی انتخاب نشده بود، مدل‌ها را دریافت کن
-                        if (!apiModel) {
-                            fetchAndPopulateModels(apiProvider, apiKey);
-                        }
+                        fetchAndPopulateModels(apiProvider, apiKey);
                     } else {
+                        localStorage.removeItem('apiKey');
+                        populateModelSelect([]);
                         showMessage('msgErrorTitle', 'msgApiKeyError');
-                    }
-                });
-
-                dom.fetchModelsBtn.addEventListener('click', async () => {
-                    const apiKey = dom.apiKeyInput.value.trim() || localStorage.getItem('apiKey');
-                    const provider = dom.apiProviderSelect.value;
-
-                    if (!apiKey) {
-                        showMessage('msgErrorTitle', 'msgApiKeyError');
-                        return;
-                    }
-
-                    await fetchAndPopulateModels(provider, apiKey);
-                });
-
-                dom.apiProviderSelect.addEventListener('change', () => {
-                    const apiKey = localStorage.getItem('apiKey');
-                    const provider = dom.apiProviderSelect.value;
-                    if (apiKey) {
-                        fetchAndPopulateModels(provider, apiKey);
-                    } else {
-                        // نمایش مدل‌های پیش‌فرض
-                        const defaultModels = getDefaultModels(provider);
-                        populateModelSelect(defaultModels);
                     }
                 });
 
@@ -1236,30 +2027,55 @@
                         showMessage('msgErrorTitle', 'msgNoFile');
                         return;
                     }
+
                     startLoading();
+                    resetChunkResults();
                     dom.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
                     try {
-                        const provider = localStorage.getItem('apiProvider');
-                        let result = '';
-                        switch (provider) {
-                            case 'gemini': result = await callGeminiAPI(getPrompt()); break;
-                            case 'openai': result = await callOpenAIAPI(getPrompt()); break;
-                            case 'claude': result = await callClaudeAPI(getPrompt()); break;
-                            default: throw new Error('Invalid API provider selected.');
-                        }
-                        dom.outputText.value = result;
-                        lastResult = result;
-                        transcriptionHistory.unshift({ fileName: selectedFile.name, text: result });
-                        saveHistory('transcription');
-                    } catch (error) {
-                        console.error('API Error:', error);
-                        if (error.message.toLowerCase().includes('api key')) {
-                            showMessage('msgErrorTitle', 'msgInvalidApiKeyError');
+                        let finalResult = '';
+                        const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10);
+                        const bitrateKbps = parseInt(dom.chunkBitrateSelect.value, 10);
+                        const fileType = selectedFile.type.split('/')[0];
+
+                        if ((fileType === 'audio' || fileType === 'video') && chunkSeconds > 0) {
+                            // Slice audio into chunks with FFmpeg.wasm
+                            const chunks = await sliceAudioFileFFmpeg(selectedFile, chunkSeconds, bitrateKbps);
+
+                            if (chunks.length > 1) {
+                                for (let i = 0; i < chunks.length; i++) {
+                                    currentChunkInfo = { current: i + 1, total: chunks.length };
+                                    dom.resultLoaderText.textContent = translations[currentLang].uploadingChunkPrefix(i + 1, chunks.length) + translations[currentLang].msgProcessingChunk(i + 1, chunks.length);
+                                    const chunkResult = await callGenericAPI(getPrompt('transcribe'), chunks[i]);
+                                    addChunkResultBox(i + 1, chunks.length, chunkResult);
+                                    finalResult += (finalResult ? '\n\n' : '') + chunkResult;
+                                }
+                                currentChunkInfo = null;
+                                dom.finalResultLabelText.textContent = translations[currentLang].finalResultLabel(chunks.length);
+                                dom.finalResultLabel.classList.remove('hidden');
+                                dom.outputText.value = finalResult;
+                                dom.chunksOutputWrapper.open = false;
+                            } else {
+                                finalResult = await callGenericAPI(getPrompt('transcribe'), chunks[0]);
+                                dom.outputText.value = finalResult;
+                            }
                         } else {
-                            showMessage('msgApiErrorTitle', error.message || 'msgUnknownError');
+                            finalResult = await callGenericAPI(getPrompt('transcribe'), selectedFile);
+                            dom.outputText.value = finalResult;
                         }
-                        dom.outputText.value = error.message;
+
+                        lastResult = finalResult;
+                        localStorage.setItem('lastResult', finalResult);
+                        transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult });
+                        saveHistory('transcription');
+
+                    } catch (error) {
+                        console.error('API / Processing Error:', error);
+                        const errorText = error.message || translations[currentLang].msgUnknownError;
+                        showMessage('msgApiErrorTitle', errorText, true, undefined, true);
+                        dom.outputText.value = errorText;
                     } finally {
+                        currentChunkInfo = null;
                         stopLoading();
                     }
                 });
@@ -1272,19 +2088,17 @@
                     }
                     startLoading(true);
                     try {
-                        const result = await callGenericAPI(getPrompt('translate'), source);
+                        const result = await callGenericAPI(getPrompt('translate'), null, source);
                         dom.translateOutputArea.value = result;
-                        lastTranslation = { input: source, output: result, formatted: dom.formatCheckbox.checked };
+                        lastTranslation = { input: source, output: result, mode: dom.translateModeSelect.value };
+                        localStorage.setItem('lastTranslation', JSON.stringify(lastTranslation));
                         translationHistory.unshift(lastTranslation);
                         saveHistory('translation');
                     } catch (error) {
                         console.error('Translation Error:', error);
-                        if (error.message.toLowerCase().includes('api key')) {
-                            showMessage('msgErrorTitle', 'msgInvalidApiKeyError');
-                        } else {
-                            showMessage('msgApiErrorTitle', error.message || 'msgUnknownError');
-                        }
-                        dom.translateOutputArea.value = error.message;
+                        const errorText = error.message || translations[currentLang].msgUnknownError;
+                        showMessage('msgApiErrorTitle', errorText, true, undefined, true);
+                        dom.translateOutputArea.value = errorText;
                     } finally {
                         stopLoading(true);
                     }
@@ -1294,18 +2108,19 @@
                 dom.sourceManualRadio.addEventListener('change', () => dom.translateInputContainerWrapper.classList.remove('hidden'));
 
                 dom.restoreBtn.addEventListener('click', () => {
-                    dom.outputText.value = lastResult;
                     if (lastResult) {
+                        dom.outputText.value = lastResult;
                         dom.outputPlaceholder.classList.add('hidden');
                         dom.outputText.classList.remove('hidden');
+                        showToast('msgHistoryRestored', false);
                     }
-                    showToast('msgHistoryRestored', false);
                 });
 
                 dom.clearBtn.addEventListener('click', () => {
                     dom.outputText.value = '';
                     dom.outputPlaceholder.classList.remove('hidden');
                     dom.outputText.classList.add('hidden');
+                    resetChunkResults();
                     showToast('msgResultCleared', false);
                 });
 
@@ -1323,24 +2138,36 @@
                     if (lastTranslation.output) {
                         dom.translateOutputArea.value = lastTranslation.output;
                         dom.translateInputArea.value = lastTranslation.input;
-                        dom.formatCheckbox.checked = lastTranslation.formatted;
+                        setCustomDropdownValue('translate-mode-dropdown', lastTranslation.mode || 'both');
+                        dom.translateModeSelect.value = lastTranslation.mode || 'both';
+                        dom.translateModeSelect.dispatchEvent(new Event('change'));
                         dom.translateOutputPlaceholder.classList.add('hidden');
                         dom.translateOutputArea.classList.remove('hidden');
+                        showToast('msgHistoryRestored', false);
                     }
-                    showToast('msgHistoryRestored', false);
                 });
 
-                dom.translateHistoryModalBtn.addEventListener('click', () => {
-                    renderTranslationHistory();
-                    dom.translateHistoryModal.classList.remove('hidden');
-                });
+                dom.resultExpandBtn.addEventListener('click', () => openExpandModal(dom.outputText));
+                dom.translateExpandBtn.addEventListener('click', () => openExpandModal(dom.translateOutputArea));
+                dom.translateInputExpandBtn.addEventListener('click', () => openExpandModal(dom.translateInputArea));
 
-                dom.historyModalBtn.addEventListener('click', () => {
-                    renderHistory();
-                    dom.historyModal.classList.remove('hidden');
-                });
+                dom.expandCloseBtn.addEventListener('click', closeExpandModal);
+                dom.expandCopyBtn.addEventListener('click', () => copyTextToClipboard(dom.expandTextArea.value));
+                dom.expandAlignLeftBtn.addEventListener('click', () => setExpandAlign('left'));
+                dom.expandAlignCenterBtn.addEventListener('click', () => setExpandAlign('center'));
+                dom.expandAlignRightBtn.addEventListener('click', () => setExpandAlign('right'));
+
+                dom.resultAlignLeftBtn.addEventListener('click', () => { dom.outputText.style.textAlign = 'left'; dom.outputText.dir = 'ltr'; });
+                dom.resultAlignCenterBtn.addEventListener('click', () => { dom.outputText.style.textAlign = 'center'; });
+                dom.resultAlignRightBtn.addEventListener('click', () => { dom.outputText.style.textAlign = 'right'; dom.outputText.dir = 'rtl'; });
+
+                dom.translateAlignLeftBtn.addEventListener('click', () => { dom.translateOutputArea.style.textAlign = 'left'; dom.translateOutputArea.dir = 'ltr'; });
+                dom.translateAlignCenterBtn.addEventListener('click', () => { dom.translateOutputArea.style.textAlign = 'center'; });
+                dom.translateAlignRightBtn.addEventListener('click', () => { dom.translateOutputArea.style.textAlign = 'right'; dom.translateOutputArea.dir = 'rtl'; });
+
+                dom.translateHistoryModalBtn.addEventListener('click', () => { renderTranslationHistory(); dom.translateHistoryModal.classList.remove('hidden'); });
+                dom.historyModalBtn.addEventListener('click', () => { renderHistory(); dom.historyModal.classList.remove('hidden'); });
                 dom.historyModalCloseBtn.addEventListener('click', () => dom.historyModal.classList.add('hidden'));
-
                 dom.translateHistoryModalCloseBtn.addEventListener('click', () => dom.translateHistoryModal.classList.add('hidden'));
 
                 dom.themeToggleBtn.addEventListener('click', () => applyTheme(dom.html.classList.contains('dark') ? 'light' : 'dark'));
@@ -1351,43 +2178,19 @@
                 dom.resetCancelBtn.addEventListener('click', () => dom.resetModal.classList.add('hidden'));
                 dom.resetConfirmBtn.addEventListener('click', () => {
                     localStorage.clear();
-                    showToast('msgAppReset');
-                    setTimeout(() => window.location.reload(), 1500);
+                    location.reload();
                 });
 
                 dom.modalCloseBtn.addEventListener('click', () => dom.messageModal.classList.add('hidden'));
-
-                if (dom.translateInputClearBtn) {
-                    dom.translateInputClearBtn.addEventListener('click', () => {
-                        dom.translateInputArea.value = '';
-                        showToast('msgResultCleared', false);
-                    });
-                }
-                if (dom.translateInputCopyBtn) {
-                    dom.translateInputCopyBtn.addEventListener('click', () => copyTextToClipboard(dom.translateInputArea.value));
-                }
+                dom.modalCopyBtn.addEventListener('click', () => copyTextToClipboard(dom.modalMessage.textContent));
 
                 dom.toggleApiKeyVisibilityBtn.addEventListener('click', () => {
-                    const icon = dom.toggleApiKeyVisibilityBtn.querySelector('iconify-icon');
-                    if (dom.apiKeyInput.type === 'password') {
-                        dom.apiKeyInput.type = 'text';
-                        icon.setAttribute('icon', 'mdi:eye-off-outline');
-                    } else {
-                        dom.apiKeyInput.type = 'password';
-                        icon.setAttribute('icon', 'mdi:eye-outline');
-                    }
-                });
-
-                document.querySelectorAll('.glow-card').forEach(card => {
-                    card.addEventListener('mousemove', (e) => {
-                        const rect = card.getBoundingClientRect();
-                        card.style.setProperty('--glow-x', `${e.clientX - rect.left}px`);
-                        card.style.setProperty('--glow-y', `${e.clientY - rect.top}px`);
-                    });
+                    const isPassword = dom.apiKeyInput.type === 'password';
+                    dom.apiKeyInput.type = isPassword ? 'text' : 'password';
+                    dom.toggleApiKeyVisibilityBtn.querySelector('iconify-icon').setAttribute('icon', isPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline');
                 });
             }
 
-            // --- Initial Load ---
             initializeApp();
         });
     </script>

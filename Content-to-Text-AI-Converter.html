@@ -315,32 +315,38 @@
 
                     <!-- FFmpeg Chunking Options (Shows up for Audio/Video) -->
                     <div id="ffmpeg-settings" class="mt-4 p-4 border border-sky-500/30 rounded-lg bg-sky-50/50 dark:bg-slate-700/50 hidden">
-                        <div class="flex items-center gap-2 mb-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
-                            <iconify-icon icon="mdi:tune-vertical" width="20" height="20"></iconify-icon>
-                            <span data-key="ffmpegTitle">FFmpeg Processing Options</span>
+                        <div class="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                            <div class="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-semibold text-sm">
+                                <iconify-icon icon="mdi:tune-vertical" width="20" height="20"></iconify-icon>
+                                <span data-key="ffmpegTitle">FFmpeg Processing Options</span>
+                            </div>
+                            <div class="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden bg-slate-50 dark:bg-slate-800 text-xs font-medium" id="ffmpeg-master-toggle">
+                                <button type="button" id="ffmpeg-on-btn" class="ffmpeg-master-btn px-3 py-1.5 transition-colors bg-sky-500 text-white" data-value="on" data-key="ffmpegOn">On</button>
+                                <button type="button" id="ffmpeg-off-btn" class="ffmpeg-master-btn px-3 py-1.5 transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600" data-value="off" data-key="ffmpegOff">Off</button>
+                            </div>
                         </div>
                         <div id="ffmpeg-coi-warning" class="hidden flex items-start gap-2 mb-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300/50 dark:border-amber-700/40 text-xs text-amber-700 dark:text-amber-400">
                             <iconify-icon icon="mdi:alert-outline" width="18" height="18" class="flex-shrink-0 mt-0.5"></iconify-icon>
                             <span data-key="msgCoiUnavailable">Chunking requires this page to be served with special security headers, which aren't active right now (chunking has been disabled and the whole file will be sent at once).</span>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div id="ffmpeg-controls" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" data-key="chunkDurationLabel">Chunk Duration (Minutes)</label>
                                 <div id="chunk-duration-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
                                     <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 40px; padding: 0.5rem 0.75rem;">
-                                        <span class="selected-text truncate" data-key="chunk5min">5 Minutes per chunk</span>
+                                        <span class="selected-text truncate" data-key="chunk5min">5 Minutes per chunk (Recommended)</span>
                                         <iconify-icon icon="mdi:chevron-down" width="18" height="18" class="text-slate-500"></iconify-icon>
                                     </div>
                                     <div class="custom-dropdown-menu">
-                                        <div class="custom-dropdown-item" data-value="180" data-key="chunk3min">3 Minutes per chunk (Recommended)</div>
-                                        <div class="custom-dropdown-item selected" data-value="300" data-key="chunk5min">5 Minutes per chunk</div>
+                                        <div class="custom-dropdown-item" data-value="180" data-key="chunk3min">3 Minutes per chunk</div>
+                                        <div class="custom-dropdown-item selected" data-value="300" data-key="chunk5min">5 Minutes per chunk (Recommended)</div>
                                         <div class="custom-dropdown-item" data-value="600" data-key="chunk10min">10 Minutes per chunk</div>
                                         <div class="custom-dropdown-item" data-value="900" data-key="chunk15min">15 Minutes per chunk</div>
                                         <div class="custom-dropdown-item" data-value="0" data-key="chunkDisabled">Disabled (Process Entire File)</div>
                                     </div>
                                     <select id="chunk-duration" class="hidden">
-                                        <option value="180" data-key="chunk3min">3 Minutes per chunk (Recommended)</option>
-                                        <option value="300" selected data-key="chunk5min">5 Minutes per chunk</option>
+                                        <option value="180" data-key="chunk3min">3 Minutes per chunk</option>
+                                        <option value="300" selected data-key="chunk5min">5 Minutes per chunk (Recommended)</option>
                                         <option value="600" data-key="chunk10min">10 Minutes per chunk</option>
                                         <option value="900" data-key="chunk15min">15 Minutes per chunk</option>
                                         <option value="0" data-key="chunkDisabled">Disabled (Process Entire File)</option>
@@ -351,24 +357,26 @@
                                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" data-key="bitrateLabel">Audio Bitrate (kbps)</label>
                                 <div id="chunk-bitrate-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
                                     <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 40px; padding: 0.5rem 0.75rem;">
-                                        <span class="selected-text truncate" data-key="bitrate128">128 kbps (Recommended)</span>
+                                        <span class="selected-text truncate" data-key="bitrate64">64 kbps (Recommended)</span>
                                         <iconify-icon icon="mdi:chevron-down" width="18" height="18" class="text-slate-500"></iconify-icon>
                                     </div>
                                     <div class="custom-dropdown-menu">
+                                        <div class="custom-dropdown-item" data-value="original" data-key="bitrateOriginal">Original (keep source)</div>
                                         <div class="custom-dropdown-item" data-value="32">32 kbps</div>
-                                        <div class="custom-dropdown-item" data-value="64">64 kbps</div>
+                                        <div class="custom-dropdown-item selected" data-value="64" data-key="bitrate64">64 kbps (Recommended)</div>
                                         <div class="custom-dropdown-item" data-value="96">96 kbps</div>
-                                        <div class="custom-dropdown-item selected" data-value="128" data-key="bitrate128">128 kbps (Recommended)</div>
+                                        <div class="custom-dropdown-item" data-value="128" data-key="bitrate128">128 kbps</div>
                                         <div class="custom-dropdown-item" data-value="160">160 kbps</div>
                                         <div class="custom-dropdown-item" data-value="192">192 kbps</div>
                                         <div class="custom-dropdown-item" data-value="256">256 kbps</div>
                                         <div class="custom-dropdown-item" data-value="320">320 kbps</div>
                                     </div>
                                     <select id="chunk-bitrate" class="hidden">
+                                        <option value="original" data-key="bitrateOriginal">Original (keep source)</option>
                                         <option value="32">32 kbps</option>
-                                        <option value="64">64 kbps</option>
+                                        <option value="64" selected data-key="bitrate64">64 kbps (Recommended)</option>
                                         <option value="96">96 kbps</option>
-                                        <option value="128" selected data-key="bitrate128">128 kbps (Recommended)</option>
+                                        <option value="128" data-key="bitrate128">128 kbps</option>
                                         <option value="160">160 kbps</option>
                                         <option value="192">192 kbps</option>
                                         <option value="256">256 kbps</option>
@@ -376,14 +384,25 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="flex items-center">
-                                <label class="inline-flex items-center cursor-pointer text-xs text-slate-600 dark:text-slate-300">
-                                    <input type="checkbox" id="extract-audio-only" checked class="sr-only peer">
-                                    <div class="relative w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-sky-500"></div>
-                                    <span class="ms-2 font-medium" data-key="extractAudioLabel">Auto Extract & Compress Audio (MP3)</span>
-                                </label>
+                            <div>
+                                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" data-key="extractAudioLabel">Auto Extract & Compress Audio (MP3)</label>
+                                <div id="extract-audio-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                                    <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 40px; padding: 0.5rem 0.75rem;">
+                                        <span class="selected-text truncate" data-key="extractEnabled">Enabled</span>
+                                        <iconify-icon icon="mdi:chevron-down" width="18" height="18" class="text-slate-500"></iconify-icon>
+                                    </div>
+                                    <div class="custom-dropdown-menu">
+                                        <div class="custom-dropdown-item selected" data-value="1" data-key="extractEnabled">Enabled</div>
+                                        <div class="custom-dropdown-item" data-value="0" data-key="extractDisabled">Disabled</div>
+                                    </div>
+                                    <select id="extract-audio-only" class="hidden">
+                                        <option value="1" selected data-key="extractEnabled">Enabled</option>
+                                        <option value="0" data-key="extractDisabled">Disabled</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
+                        <div id="ffmpeg-plan-summary" class="mt-3 p-2.5 rounded-lg bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 leading-relaxed"></div>
                     </div>
 
                     <div class="mt-6">
@@ -426,11 +445,12 @@
                             <button id="result-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
                             <button id="result-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
                             <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
-                            <button id="result-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
                             <button id="history-modal-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="historyBtnTooltip" title="History"><iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon></button>
                             <button id="restore-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="restoreBtnTooltip" title="Restore last result"><iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon></button>
                             <button id="clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
                             <button id="copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="result-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
                         </div>
                     </div>
                     <h3 id="final-result-label" class="hidden text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-2">
@@ -442,8 +462,8 @@
                         <div id="loader" class="flex flex-col items-center justify-center gap-3 hidden">
                             <div class="relative w-16 h-16 flex items-center justify-center">
                                 <svg id="progress-svg" class="w-full h-full transform -rotate-90 hidden" viewBox="0 0 36 36">
-                                    <path class="text-slate-300 dark:text-slate-600" stroke-width="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    <path id="progress-circle-path" class="text-sky-500" stroke-width="3.8" stroke-dasharray="0, 100" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="text-slate-300 dark:text-slate-600" stroke-width="3.8" stroke="currentColor" fill="none" pathLength="100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path id="progress-circle-path" class="text-sky-500 transition-[stroke-dasharray] duration-150" stroke-width="3.8" stroke-dasharray="0, 100" stroke-linecap="round" stroke="currentColor" fill="none" pathLength="100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                                 </svg>
                                 <iconify-icon id="infinite-spinner" icon="mdi:loading" class="animate-spin text-sky-500 absolute" width="50" height="50" dir="ltr"></iconify-icon>
                             </div>
@@ -466,15 +486,9 @@
 
                     <div class="mb-4">
                         <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="translateSourceLabel">Input Source</label>
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-center">
-                                <input id="source-result" name="translate-source" type="radio" checked class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300">
-                                <label for="source-result" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceResultLabel">From Result Box</label>
-                            </div>
-                            <div class="flex items-center">
-                                <input id="source-manual" name="translate-source" type="radio" class="w-4 h-4 text-sky-600 bg-gray-100 border-gray-300">
-                                <label for="source-manual" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300 cursor-pointer" data-key="sourceManualLabel">Manual Input</label>
-                            </div>
+                        <div class="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden bg-slate-50 dark:bg-slate-700" id="source-toggle-group">
+                            <button type="button" id="source-result" class="source-toggle-btn flex-1 py-2.5 px-4 text-sm font-medium transition-colors bg-sky-500 text-white" data-value="result" data-key="sourceResultLabel">From Result Box</button>
+                            <button type="button" id="source-manual" class="source-toggle-btn flex-1 py-2.5 px-4 text-sm font-medium transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600" data-value="manual" data-key="sourceManualLabel">Manual Input</button>
                         </div>
                     </div>
 
@@ -483,8 +497,9 @@
                             <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="translationHistoryInput">Input</h3>
                             <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
                                 <button id="translate-input-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
-                                <button id="translate-input-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
+                                <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
                                 <button id="translate-input-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
+                                <button id="translate-input-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
                             </div>
                         </div>
                         <div id="translate-input-container" class="w-full min-h-[150px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
@@ -537,6 +552,17 @@
                         </div>
                     </div>
 
+                    <div class="mt-4" id="tone-select-wrapper">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="toneLabel">Tone / Style (multi-select)</label>
+                        <div id="tone-checkboxes" class="flex flex-wrap gap-2">
+                            <button type="button" class="tone-chip selected px-3 py-1.5 rounded-lg text-sm font-medium border border-sky-500 bg-sky-500 text-white transition-colors" data-value="neutral" data-key="toneNeutral">Neutral</button>
+                            <button type="button" class="tone-chip px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:border-sky-400 transition-colors" data-value="formal" data-key="toneFormal">Formal</button>
+                            <button type="button" class="tone-chip px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:border-sky-400 transition-colors" data-value="casual" data-key="toneCasual">Casual</button>
+                            <button type="button" class="tone-chip px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:border-sky-400 transition-colors" data-value="professional" data-key="toneProfessional">Professional</button>
+                            <button type="button" class="tone-chip px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:border-sky-400 transition-colors" data-value="friendly" data-key="toneFriendly">Friendly</button>
+                        </div>
+                    </div>
+
                     <button id="translate-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
                         <iconify-icon id="translate-icon" icon="mdi:translate"></iconify-icon>
                         <span id="translate-btn-text" data-key="translateBtn">Process</span>
@@ -549,11 +575,12 @@
                             <button id="translate-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
                             <button id="translate-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
                             <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
-                            <button id="translate-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
                             <button id="translate-history-modal-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="historyBtnTooltip" title="History"><iconify-icon icon="mdi:history" width="18" height="18"></iconify-icon></button>
                             <button id="translate-restore-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="restoreBtnTooltip" title="Restore last result"><iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon></button>
                             <button id="translate-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
                             <button id="translate-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="translate-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
                         </div>
                     </div>
 
@@ -564,6 +591,14 @@
                         </div>
                         <textarea id="translate-output-area" class="min-h-[200px] hidden"></textarea>
                     </div>
+                    <details id="tones-output-wrapper" class="hidden mt-4 group">
+                        <summary class="cursor-pointer select-none text-sm font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2 py-1">
+                            <iconify-icon icon="mdi:chevron-right" width="16" height="16" class="transition-transform group-open:rotate-90"></iconify-icon>
+                            <iconify-icon icon="mdi:palette-outline" width="16" height="16"></iconify-icon>
+                            <span data-key="tonesResultTitle">Tone Variants</span>
+                        </summary>
+                        <div id="tones-output-list" class="space-y-2 mt-2"></div>
+                    </details>
                 </section>
             </div>
         </main>
@@ -588,23 +623,22 @@
                         <span data-key="expandModalTitle">Expanded View</span>
                     </h3>
                     <div class="flex items-center gap-2" dir="ltr">
-                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 p-1">
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 p-1 shadow-sm">
                             <button id="expand-align-left-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Left Align"><iconify-icon icon="mdi:format-align-left" width="18" height="18"></iconify-icon></button>
                             <button id="expand-align-center-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Center Align"><iconify-icon icon="mdi:format-align-center" width="18" height="18"></iconify-icon></button>
                             <button id="expand-align-right-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" title="Right Align"><iconify-icon icon="mdi:format-align-right" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="expand-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
                         </div>
-                        <button id="expand-copy-btn" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-500 transition-colors flex items-center gap-1.5 text-sm font-medium">
-                            <iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>
-                            <span data-key="copyBtnTooltip">Copy text</span>
-                        </button>
-                        <button id="expand-close-btn" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-1.5 text-sm font-bold">
-                            <iconify-icon icon="mdi:arrow-collapse-all" width="18" height="18"></iconify-icon>
-                            <span data-key="collapseBtn">Collapse</span>
-                        </button>
+                        <div class="flex items-center border border-red-500/30 rounded-lg overflow-hidden bg-red-500/15 p-1 shadow-sm">
+                            <button id="expand-close-btn" class="inline-flex items-center justify-center p-1.5 rounded text-red-500 hover:bg-red-500 hover:text-white transition-colors" title="Collapse">
+                                <iconify-icon icon="mdi:arrow-collapse-all" width="18" height="18"></iconify-icon>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-900/30">
-                    <textarea id="expand-text-area" class="w-full h-full text-base md:text-lg leading-relaxed text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none resize-none" placeholder=""></textarea>
+                <div class="p-6 flex-1 min-h-0 bg-slate-50/50 dark:bg-slate-900/30">
+                    <textarea id="expand-text-area" class="w-full h-full text-base md:text-lg leading-relaxed text-slate-800 dark:text-slate-100 bg-transparent border-none outline-none resize-none overflow-y-auto" placeholder=""></textarea>
                 </div>
             </div>
         </div>
@@ -623,7 +657,7 @@
         </div>
 
         <div id="reset-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
-            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-sm w-full text-center">
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-md w-full text-center">
                 <h3 class="text-xl font-bold mb-4 text-red-500" data-key="resetModalTitle">Reset Application?</h3>
                 <p class="text-slate-600 dark:text-slate-300 mb-6" data-key="resetModalText">This will clear all saved data including API key, history, and settings. This action cannot be undone.</p>
                 <div class="flex justify-center gap-4">
@@ -781,7 +815,7 @@
                 ffmpegCoiWarning: document.getElementById('ffmpeg-coi-warning'),
                 chunkDurationSelect: document.getElementById('chunk-duration'),
                 chunkBitrateSelect: document.getElementById('chunk-bitrate'),
-                extractAudioOnlyCheckbox: document.getElementById('extract-audio-only'),
+                extractAudioOnlySelect: document.getElementById('extract-audio-only'),
                 chunksOutputWrapper: document.getElementById('chunks-output-wrapper'),
                 chunksOutputList: document.getElementById('chunks-output-list'),
                 finalResultLabel: document.getElementById('final-result-label'),
@@ -961,14 +995,35 @@
                     msgProcessingModel: "Uploading finished! Processing file with AI model...",
                     ffmpegTitle: "FFmpeg Audio/Video Processing",
                     chunkDurationLabel: "Chunk Duration (Minutes)",
-                    chunk3min: "3 Minutes per chunk (Recommended)",
-                    chunk5min: "5 Minutes per chunk",
+                    chunk3min: "3 Minutes per chunk",
+                    chunk5min: "5 Minutes per chunk (Recommended)",
                     chunk10min: "10 Minutes per chunk",
                     chunk15min: "15 Minutes per chunk",
                     chunkDisabled: "Disabled (Process Entire File)",
                     bitrateLabel: "Audio Bitrate (kbps)",
-                    bitrate128: "128 kbps (Recommended)",
+                    bitrate64: "64 kbps (Recommended)",
+                    bitrate128: "128 kbps",
+                    bitrateOriginal: "Original (keep source)",
                     extractAudioLabel: "Auto Extract & Compress Audio (MP3)",
+                    extractEnabled: "Enabled",
+                    extractDisabled: "Disabled",
+                    ffmpegOn: "On",
+                    ffmpegOff: "Off",
+                    ffmpegPlanPassthrough: "FFmpeg will not modify the file. The original file will be uploaded as-is.",
+                    ffmpegPlanChunk: (mins, bitrate, extract) => `FFmpeg will split the file into ~${mins}-minute chunks as MP3${extract ? ' (audio extracted)' : ''}, bitrate: ${bitrate}, then each chunk is sent to the AI.`,
+                    ffmpegPlanExtractOnly: (bitrate) => `FFmpeg will extract/compress the whole file to a single MP3 (bitrate: ${bitrate}) and send it without chunking.`,
+                    ffmpegPlanOff: "FFmpeg is Off. The original file will be uploaded without any processing.",
+                    msgEncodingFile: "Preparing file data...",
+
+                    toneLabel: "Tone / Style (multi-select)",
+                    toneNeutral: "Neutral",
+                    toneFormal: "Formal",
+                    toneCasual: "Casual",
+                    toneProfessional: "Professional",
+                    toneFriendly: "Friendly",
+                    tonesResultTitle: "Tone Variants",
+                    finalToneLabel: (n) => `Combined Result (${n} tone variants)`,
+                    toneBoxLabel: (name) => `Tone: ${name}`,
                     msgFFmpegLoading: "Loading FFmpeg WebAssembly engine in browser...",
                     msgFFmpegLoadError: "Failed to load the FFmpeg engine in this browser. Try a different browser, disable extensions, or set chunking to \"Disabled\".",
                     msgCoiUnavailable: "Chunking requires this page to be served with special security headers, which aren't active right now (chunking has been disabled and the whole file will be sent at once).",
@@ -1069,14 +1124,35 @@
                     msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است...",
                     ffmpegTitle: "تنظیمات پردازش صوت/ویدیو با FFmpeg",
                     chunkDurationLabel: "مدت‌زمان هر چانک (دقیقه)",
-                    chunk3min: "۳ دقیقه در هر چانک (پیشنهادی)",
-                    chunk5min: "۵ دقیقه در هر چانک",
+                    chunk3min: "۳ دقیقه در هر چانک",
+                    chunk5min: "۵ دقیقه در هر چانک (پیشنهادی)",
                     chunk10min: "۱۰ دقیقه در هر چانک",
                     chunk15min: "۱۵ دقیقه در هر چانک",
                     chunkDisabled: "غیرفعال (پردازش کل فایل)",
                     bitrateLabel: "بیت‌ریت صدا (kbps)",
-                    bitrate128: "۱۲۸ kbps (پیشنهادی)",
+                    bitrate64: "۶۴ kbps (پیشنهادی)",
+                    bitrate128: "۱۲۸ kbps",
+                    bitrateOriginal: "اصلی (همان سورس)",
                     extractAudioLabel: "استخراج و فشرده‌سازی خودکار صدا (MP3)",
+                    extractEnabled: "فعال",
+                    extractDisabled: "غیرفعال",
+                    ffmpegOn: "روشن",
+                    ffmpegOff: "خاموش",
+                    ffmpegPlanPassthrough: "FFmpeg تغییری روی فایل نمی‌دهد و خود فایل اصلی ارسال خواهد شد.",
+                    ffmpegPlanChunk: (mins, bitrate, extract) => `FFmpeg فایل را به چانک‌های حدود ${mins} دقیقه‌ای با فرمت MP3${extract ? ' (استخراج صدا)' : ''} و بیت‌ریت ${bitrate} تبدیل می‌کند و هر چانک جداگانه به هوش مصنوعی ارسال می‌شود.`,
+                    ffmpegPlanExtractOnly: (bitrate) => `FFmpeg کل فایل را یک‌بار به MP3 با بیت‌ریت ${bitrate} تبدیل/استخراج می‌کند و بدون چانک‌بندی ارسال می‌کند.`,
+                    ffmpegPlanOff: "FFmpeg خاموش است. فایل اصلی بدون هیچ پردازشی ارسال می‌شود.",
+                    msgEncodingFile: "در حال آماده‌سازی داده فایل...",
+
+                    toneLabel: "لحن / سبک (چند انتخابی)",
+                    toneNeutral: "خنثی",
+                    toneFormal: "رسمی",
+                    toneCasual: "محاوره‌ای",
+                    toneProfessional: "حرفه‌ای",
+                    toneFriendly: "دوستانه",
+                    tonesResultTitle: "نسخه‌های لحن",
+                    finalToneLabel: (n) => `نتیجه ترکیبی (${n} نسخه لحن)`,
+                    toneBoxLabel: (name) => `لحن: ${name}`,
                     msgFFmpegLoading: "در حال بارگذاری موتور FFmpeg WebAssembly در مرورگر...",
                     msgFFmpegLoadError: "بارگذاری موتور FFmpeg در این مرورگر با خطا مواجه شد. مرورگر دیگری را امتحان کنید، افزونه‌ها را غیرفعال کنید یا گزینه چانک‌بندی را «غیرفعال» بگذارید.",
                     msgCoiUnavailable: "قابلیت چانک‌بندی نیاز به هدرهای امنیتی خاصی داره که در حال حاضر روی این صفحه فعال نیستن (چانک‌بندی غیرفعال شد و کل فایل یکجا ارسال می‌شه).",
@@ -1107,6 +1183,7 @@
                 dom.langEnBtn.classList.toggle('text-white', lang === 'en');
                 dom.langFaBtn.classList.toggle('bg-sky-500', lang === 'fa');
                 dom.langFaBtn.classList.toggle('text-white', lang === 'fa');
+                if (typeof updateFfmpegPlanSummary === 'function') updateFfmpegPlanSummary();
             }
 
             function applyTheme(theme) {
@@ -1180,12 +1257,91 @@
                 dom.ffmpegCoiWarning.classList.toggle('hidden', supported);
                 const durationDropdown = document.getElementById('chunk-duration-dropdown');
                 const bitrateDropdown = document.getElementById('chunk-bitrate-dropdown');
-                [durationDropdown, bitrateDropdown].forEach(el => {
+                const extractDropdown = document.getElementById('extract-audio-dropdown');
+                const masterToggle = document.getElementById('ffmpeg-master-toggle');
+                [durationDropdown, bitrateDropdown, extractDropdown].forEach(el => {
+                    if (!el) return;
                     el.classList.toggle('opacity-50', !supported);
                     el.classList.toggle('pointer-events-none', !supported);
                 });
+                if (masterToggle) {
+                    masterToggle.classList.toggle('opacity-50', !supported);
+                    masterToggle.classList.toggle('pointer-events-none', !supported);
+                }
                 if (!supported) {
                     setCustomDropdownValue('chunk-duration-dropdown', '0');
+                    setCustomDropdownValue('extract-audio-dropdown', '0');
+                    setFfmpegMaster(false, true);
+                }
+                updateFfmpegPlanSummary();
+            }
+
+            function setFfmpegMaster(on, skipRecommended = false) {
+                const onBtn = document.getElementById('ffmpeg-on-btn');
+                const offBtn = document.getElementById('ffmpeg-off-btn');
+                if (!onBtn || !offBtn) return;
+                const activate = (btn, active) => {
+                    if (active) {
+                        btn.classList.add('bg-sky-500', 'text-white');
+                        btn.classList.remove('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600');
+                    } else {
+                        btn.classList.remove('bg-sky-500', 'text-white');
+                        btn.classList.add('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600');
+                    }
+                };
+                activate(onBtn, on);
+                activate(offBtn, !on);
+                const controls = document.getElementById('ffmpeg-controls');
+                if (controls) {
+                    controls.classList.toggle('opacity-50', !on);
+                    controls.classList.toggle('pointer-events-none', !on);
+                }
+                if (!on) {
+                    setCustomDropdownValue('chunk-duration-dropdown', '0');
+                    setCustomDropdownValue('chunk-bitrate-dropdown', 'original');
+                    setCustomDropdownValue('extract-audio-dropdown', '0');
+                } else if (!skipRecommended) {
+                    setCustomDropdownValue('chunk-duration-dropdown', '300');
+                    setCustomDropdownValue('chunk-bitrate-dropdown', '64');
+                    setCustomDropdownValue('extract-audio-dropdown', '1');
+                }
+                updateFfmpegPlanSummary();
+            }
+
+            function updateFfmpegPlanSummary() {
+                const el = document.getElementById('ffmpeg-plan-summary');
+                if (!el) return;
+                const masterOn = document.getElementById('ffmpeg-on-btn')?.classList.contains('bg-sky-500');
+                const chunkSeconds = parseInt(document.getElementById('chunk-duration')?.value || '0', 10);
+                const bitrateVal = document.getElementById('chunk-bitrate')?.value || '64';
+                const extractOn = document.getElementById('extract-audio-only')?.value === '1';
+                const t = translations[currentLang];
+                const bitrateLabel = bitrateVal === 'original'
+                    ? (t.bitrateOriginal || 'Original')
+                    : `${bitrateVal} kbps`;
+
+                if (!masterOn || !isChunkingSupported()) {
+                    el.textContent = t.ffmpegPlanOff || t.ffmpegPlanPassthrough;
+                    return;
+                }
+                if (chunkSeconds === 0 && !extractOn && bitrateVal === 'original') {
+                    el.textContent = t.ffmpegPlanPassthrough;
+                    return;
+                }
+                if (chunkSeconds === 0 && !extractOn) {
+                    // Master on but nothing to process meaningfully
+                    el.textContent = t.ffmpegPlanPassthrough;
+                    return;
+                }
+                if (chunkSeconds > 0) {
+                    const mins = Math.round(chunkSeconds / 60);
+                    el.textContent = typeof t.ffmpegPlanChunk === 'function'
+                        ? t.ffmpegPlanChunk(mins, bitrateLabel, extractOn)
+                        : t.ffmpegPlanChunk;
+                } else {
+                    el.textContent = typeof t.ffmpegPlanExtractOnly === 'function'
+                        ? t.ffmpegPlanExtractOnly(bitrateLabel)
+                        : t.ffmpegPlanExtractOnly;
                 }
             }
 
@@ -1213,7 +1369,8 @@
                     const container = document.createElement('div');
                     container.className = 'relative text-center border border-slate-200 dark:border-slate-700 p-4 rounded-lg';
                     const fileNameElement = document.createElement('p');
-                    fileNameElement.textContent = `${translations[currentLang].msgSelectedFile} ${file.name}`;
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    fileNameElement.textContent = `${file.name} (${sizeMB} MB)`;
                     fileNameElement.className = 'text-sm text-slate-500 dark:text-slate-400 mb-2';
                     const removeBtn = document.createElement('button');
                     removeBtn.innerHTML = `<iconify-icon icon="mdi:close" width="20" height="20"></iconify-icon>`;
@@ -1276,35 +1433,100 @@
                 throw new Error(`${translations[currentLang].msgFFmpegLoadError}\n\n(${detail})`);
             }
 
-            async function sliceAudioFileFFmpeg(file, chunkDuration, bitrateKbps) {
+            function buildAudioBitrateArgs(bitrateValue) {
+                if (!bitrateValue || bitrateValue === 'original') {
+                    // Keep quality close to source (VBR high quality)
+                    return ['-q:a', '2'];
+                }
+                return ['-b:a', `${bitrateValue}k`];
+            }
+
+            async function extractAudioFFmpeg(file, bitrateValue) {
+                await loadFFmpeg();
+                dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegLoading;
+                const inputName = `input_${Date.now()}.${file.name.split('.').pop()}`;
+                const outputName = `output_${Date.now()}.mp3`;
+                ffmpeg.FS('writeFile', inputName, await fetchFile(file));
+                await ffmpeg.run(
+                    '-i', inputName,
+                    '-vn',
+                    '-acodec', 'libmp3lame',
+                    ...buildAudioBitrateArgs(bitrateValue),
+                    outputName
+                );
+                const data = ffmpeg.FS('readFile', outputName);
+                const blob = new Blob([data.buffer], { type: 'audio/mp3' });
+                const outFile = new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'audio'}.mp3`, { type: 'audio/mp3' });
+                ffmpeg.FS('unlink', inputName);
+                ffmpeg.FS('unlink', outputName);
+                return outFile;
+            }
+
+            async function sliceAudioFileFFmpeg(file, chunkDuration, bitrateValue) {
                 await loadFFmpeg();
 
                 const duration = await getFileDuration(file);
-                if (!duration || duration <= chunkDuration) {
-                    return [file]; // Return as single file if short
-                }
-
                 const ext = 'mp3';
                 const inputName = `input_${Date.now()}.${file.name.split('.').pop()}`;
                 ffmpeg.FS('writeFile', inputName, await fetchFile(file));
+                const brArgs = buildAudioBitrateArgs(bitrateValue);
+
+                // Show progress ring for FFmpeg phase
+                const showFfmpegProgress = (done, total) => {
+                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                    if (dom.loader) dom.loader.classList.remove('hidden');
+                    if (dom.outputPlaceholder) dom.outputPlaceholder.classList.add('hidden');
+                    if (dom.outputText) dom.outputText.classList.add('hidden');
+                    if (dom.progressSvg) dom.progressSvg.classList.remove('hidden');
+                    if (dom.infiniteSpinner) dom.infiniteSpinner.classList.add('hidden');
+                    if (dom.progressCirclePath) dom.progressCirclePath.setAttribute('stroke-dasharray', `${pct}, 100`);
+                    if (dom.resultLoaderText) {
+                        dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegProcessing(
+                            Math.min(done + (done < total ? 1 : 0), total) || 1,
+                            total
+                        );
+                    }
+                };
+
+                // No chunking (or file shorter than one chunk): single compressed MP3
+                if (!duration || !chunkDuration || duration <= chunkDuration) {
+                    showFfmpegProgress(0, 1);
+                    const outputName = `chunk_0.${ext}`;
+                    await ffmpeg.run(
+                        '-i', inputName,
+                        '-vn',
+                        '-acodec', 'libmp3lame',
+                        ...brArgs,
+                        outputName
+                    );
+                    const data = ffmpeg.FS('readFile', outputName);
+                    const chunkFile = new File([new Blob([data.buffer], { type: 'audio/mp3' })], 'part_1.mp3', { type: 'audio/mp3' });
+                    ffmpeg.FS('unlink', outputName);
+                    ffmpeg.FS('unlink', inputName);
+                    showFfmpegProgress(1, 1);
+                    return [chunkFile];
+                }
 
                 const chunks = [];
                 const totalChunks = Math.ceil(duration / chunkDuration);
+                showFfmpegProgress(0, totalChunks);
 
                 for (let i = 0; i < totalChunks; i++) {
                     const startTime = i * chunkDuration;
                     const outputName = `chunk_${i}.${ext}`;
 
-                    dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegProcessing(i + 1, totalChunks);
+                    // Text shows "working on chunk i+1"; ring fills after each completes
+                    if (dom.resultLoaderText) {
+                        dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegProcessing(i + 1, totalChunks);
+                    }
 
-                    // FFmpeg command to slice audio without re-encoding video
                     await ffmpeg.run(
                         '-ss', startTime.toString(),
                         '-i', inputName,
                         '-t', chunkDuration.toString(),
-                        '-vn', // Disable Video
+                        '-vn',
                         '-acodec', 'libmp3lame',
-                        '-b:a', `${bitrateKbps || 128}k`,
+                        ...brArgs,
                         outputName
                     );
 
@@ -1312,20 +1534,52 @@
                     const chunkBlob = new Blob([data.buffer], { type: 'audio/mp3' });
                     const chunkFile = new File([chunkBlob], `part_${i + 1}.mp3`, { type: 'audio/mp3' });
                     chunks.push(chunkFile);
-
                     ffmpeg.FS('unlink', outputName);
+
+                    // Fill ring: after 1 of 4 → 25%, after 2 → 50%, ...
+                    showFfmpegProgress(i + 1, totalChunks);
+                    await new Promise(r => setTimeout(r, 0)); // let UI paint
                 }
 
                 ffmpeg.FS('unlink', inputName);
                 return chunks;
             }
 
-            function fileToBase64(file) {
+            function fileToBase64(file, onProgress) {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    const total = file.size || 0;
+                    const startTime = Date.now();
+                    reader.onprogress = (e) => {
+                        if (!onProgress || !e.lengthComputable || e.total <= 0) return;
+                        const timeDiff = Math.max((Date.now() - startTime) / 1000, 0.001);
+                        const speedMBps = ((e.loaded / (1024 * 1024)) / timeDiff).toFixed(2);
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        const remaining = e.total - e.loaded;
+                        const etaSec = (e.loaded > 0) ? Math.ceil(remaining / (e.loaded / timeDiff)) : 0;
+                        const eta = etaSec >= 60 ? `${Math.floor(etaSec / 60)}m ${etaSec % 60}s` : `${etaSec}s`;
+                        onProgress({
+                            percent,
+                            uploadedMB: (e.loaded / (1024 * 1024)).toFixed(2),
+                            totalMB: (e.total / (1024 * 1024)).toFixed(2),
+                            speedMBps,
+                            eta
+                        });
+                    };
+                    reader.onload = () => {
+                        if (onProgress && total > 0) {
+                            onProgress({
+                                percent: 100,
+                                uploadedMB: (total / (1024 * 1024)).toFixed(2),
+                                totalMB: (total / (1024 * 1024)).toFixed(2),
+                                speedMBps: '—',
+                                eta: '0s'
+                            });
+                        }
+                        resolve(reader.result.split(',')[1]);
+                    };
                     reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
                 });
             }
 
@@ -1341,13 +1595,17 @@
                 } else if (task === 'translate') {
                     const mode = dom.translateModeSelect.value;
                     const targetLanguage = document.querySelector(`#translate-language-select option[value="${dom.translateLangSelect.value}"]`)?.textContent || "Persian";
+                    const tone = arguments[1] || null;
+                    const toneHint = tone && tone !== 'neutral'
+                        ? (currentLang === 'fa' ? ` لحن متن را ${tone} بنویس.` : ` Use a ${tone} tone/style.`)
+                        : '';
 
                     if (mode === 'both') {
-                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن و متن را کاملاً مرتب، پاراگراف‌بندی و ساختاربندی کن.` : `Translate the following text to ${targetLanguage} and format/structure the text with proper paragraphing.`);
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن و متن را کاملاً مرتب، پاراگراف‌بندی و ساختاربندی کن.${toneHint}` : `Translate the following text to ${targetLanguage} and format/structure the text with proper paragraphing.${toneHint}`);
                     } else if (mode === 'translate') {
-                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن. ساختار اصلی متن را تغییر نده.` : `Translate the following text to ${targetLanguage}. Keep the original structure as is.`);
+                        return (currentLang === 'fa' ? `متن زیر را به زبان ${targetLanguage} ترجمه کن. ساختار اصلی متن را تغییر نده.${toneHint}` : `Translate the following text to ${targetLanguage}. Keep the original structure as is.${toneHint}`);
                     } else if (mode === 'format') {
-                        return (currentLang === 'fa' ? `متن زیر را فقط مرتب، ویرایش و پاراگراف‌بندی کن. زبان متن را تغییر نده.` : `Format, clean up, and structure the following text into proper paragraphs. Do not change the language.`);
+                        return (currentLang === 'fa' ? `متن زیر را فقط مرتب، ویرایش و پاراگراف‌بندی کن. زبان متن را تغییر نده.${toneHint}` : `Format, clean up, and structure the following text into proper paragraphs. Do not change the language.${toneHint}`);
                     }
                 }
             }
@@ -1364,6 +1622,7 @@
                 }
             }
 
+            // Real XHR upload progress only (same approach as the working older version)
             function xhrRequest({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
                 return new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
@@ -1378,28 +1637,31 @@
 
                     if (xhr.upload && onUploadProgress) {
                         xhr.upload.onprogress = (e) => {
-                            if (e.lengthComputable) {
-                                const now = Date.now();
-                                const timeDiff = (now - startTime) / 1000;
-                                const speedBytesPerSec = timeDiff > 0 ? (e.loaded / timeDiff) : 0;
-                                const speedMBps = (speedBytesPerSec / (1024 * 1024)).toFixed(2);
-                                const percent = Math.round((e.loaded / e.total) * 100);
-                                const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
-                                const totalMB = (e.total / (1024 * 1024)).toFixed(2);
-
-                                const remainingBytes = e.total - e.loaded;
-                                let etaSec = speedBytesPerSec > 0 ? Math.ceil(remainingBytes / speedBytesPerSec) : 0;
-                                let etaFormatted = "0s";
-                                if (etaSec >= 60) {
-                                    const mins = Math.floor(etaSec / 60);
-                                    const secs = etaSec % 60;
-                                    etaFormatted = `${mins}m ${secs}s`;
-                                } else {
-                                    etaFormatted = `${etaSec}s`;
-                                }
-
-                                onUploadProgress({ percent, uploadedMB, totalMB, speedMBps, eta: etaFormatted });
-                            }
+                            if (!e.lengthComputable || e.total <= 0) return;
+                            const now = Date.now();
+                            const timeDiff = (now - startTime) / 1000;
+                            const speedBytesPerSec = timeDiff > 0 ? (e.loaded / timeDiff) : 0;
+                            const speedMBps = (speedBytesPerSec / (1024 * 1024)).toFixed(2);
+                            // Cap at 99 so UI stays on the progress ring until upload.onload → 100
+                            const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+                            const uploadedMB = (e.loaded / (1024 * 1024)).toFixed(2);
+                            const totalMB = (e.total / (1024 * 1024)).toFixed(2);
+                            const remainingBytes = e.total - e.loaded;
+                            let etaSec = speedBytesPerSec > 0 ? Math.ceil(remainingBytes / speedBytesPerSec) : 0;
+                            let etaFormatted = etaSec >= 60
+                                ? `${Math.floor(etaSec / 60)}m ${etaSec % 60}s`
+                                : `${etaSec}s`;
+                            onUploadProgress({ percent, uploadedMB, totalMB, speedMBps, eta: etaFormatted });
+                        };
+                        // Fires when all request bytes have been sent (before server responds)
+                        xhr.upload.onload = () => {
+                            onUploadProgress({
+                                percent: 100,
+                                uploadedMB: '—',
+                                totalMB: '—',
+                                speedMBps: '—',
+                                eta: '0s'
+                            });
                         };
                     }
 
@@ -1562,19 +1824,28 @@
                 const chunkPrefix = currentChunkInfo
                     ? translations[currentLang].uploadingChunkPrefix(currentChunkInfo.current, currentChunkInfo.total)
                     : '';
+                // Always keep loader visible during upload/processing
+                if (dom.loader) dom.loader.classList.remove('hidden');
+                if (dom.outputPlaceholder) dom.outputPlaceholder.classList.add('hidden');
+                if (dom.outputText) dom.outputText.classList.add('hidden');
+
                 if (info.percent < 100) {
                     dom.progressSvg.classList.remove('hidden');
                     dom.infiniteSpinner.classList.add('hidden');
-                    dom.progressCirclePath.setAttribute('stroke-dasharray', `${info.percent}, 100`);
+                    const pct = Math.max(0, Math.min(100, Number(info.percent) || 0));
+                    dom.progressCirclePath.setAttribute('stroke-dasharray', `${pct}, 100`);
 
                     const progressText = translations[currentLang].msgUploading(
-                        info.percent, info.uploadedMB, info.totalMB, info.speedMBps, info.eta
+                        pct, info.uploadedMB, info.totalMB, info.speedMBps, info.eta || '—'
                     );
                     dom.resultLoaderText.textContent = chunkPrefix + progressText;
                 } else {
                     dom.progressSvg.classList.add('hidden');
                     dom.infiniteSpinner.classList.remove('hidden');
-                    dom.resultLoaderText.textContent = chunkPrefix + translations[currentLang].msgProcessingModel;
+                    const processingText = currentChunkInfo
+                        ? translations[currentLang].msgProcessingChunk(currentChunkInfo.current, currentChunkInfo.total)
+                        : translations[currentLang].msgProcessingModel;
+                    dom.resultLoaderText.textContent = chunkPrefix + processingText;
                 }
             }
 
@@ -1588,7 +1859,7 @@
             function addChunkResultBox(current, total, text) {
                 dom.chunksOutputWrapper.classList.remove('hidden');
                 const box = document.createElement('div');
-                box.className = 'min-h-[200px] flex flex-col bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-3';
+                box.className = 'h-[200px] flex flex-col bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-3';
 
                 const header = document.createElement('div');
                 header.className = 'flex justify-between items-center mb-1.5 flex-shrink-0';
@@ -1614,68 +1885,57 @@
             async function callGeminiAPI(prompt, file, textInput = null) {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiModel = localStorage.getItem('apiModel') || 'gemini-2.5-flash';
-
-                if (!textInput && file.size > 20 * 1024 * 1024) {
-                    const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
-                    const initRes = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'X-Goog-Upload-Protocol': 'resumable',
-                            'X-Goog-Upload-Command': 'start',
-                            'X-Goog-Upload-Header-Content-Length': file.size,
-                            'X-Goog-Upload-Header-Content-Type': file.type,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ file: { display_name: file.name } })
-                    });
-
-                    const resUrl = initRes.headers.get('X-Goog-Upload-URL');
-                    if (!resUrl) throw new Error('Could not initiate file upload for large file.');
-
-                    const fileData = await xhrRequest({
-                        url: resUrl,
-                        method: 'POST',
-                        headers: {
-                            'X-Goog-Upload-Offset': '0',
-                            'X-Goog-Upload-Command': 'upload, finalize'
-                        },
-                        body: file,
-                        onUploadProgress: (info) => updateProgressUI(info)
-                    });
-
-                    const fileUri = fileData.file.uri;
-                    const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
-                    const payload = { contents: [{ parts: [{ text: prompt }, { file_data: { mime_type: file.type, file_uri: fileUri } }] }] };
-
-                    const data = await xhrRequest({
-                        url: genUrl,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (data.error) throw new Error(data.error.message);
-                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
-                    throw new Error(translations[currentLang].msgNoTextReturned);
-                }
-
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
+
                 let parts = [{ text: prompt }];
                 if (textInput) {
                     parts.push({ text: textInput });
                 } else {
+                    // Preparing: encode file to base64 (show spinning loader, not progress ring)
+                    if (dom.progressSvg) dom.progressSvg.classList.add('hidden');
+                    if (dom.infiniteSpinner) dom.infiniteSpinner.classList.remove('hidden');
+                    if (dom.resultLoaderText) {
+                        const prefix = currentChunkInfo
+                            ? translations[currentLang].uploadingChunkPrefix(currentChunkInfo.current, currentChunkInfo.total)
+                            : '';
+                        dom.resultLoaderText.textContent = prefix + (currentLang === 'fa' ? 'آماده‌سازی فایل برای آپلود...' : 'Preparing file for upload...');
+                    }
                     const base64Data = await fileToBase64(file);
                     parts.push({ inline_data: { mime_type: file.type, data: base64Data } });
+                }
+                const payload = { contents: [{ parts }] };
+                // Blob body → reliable XHR upload progress events
+                const bodyBlob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+
+                if (!textInput) {
+                    // Reset to 0% — pure upload phase starts now
+                    updateProgressUI({
+                        percent: 0,
+                        uploadedMB: '0.00',
+                        totalMB: (bodyBlob.size / (1024 * 1024)).toFixed(2),
+                        speedMBps: '0.00',
+                        eta: '—'
+                    });
                 }
 
                 const data = await xhrRequest({
                     url,
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts }] }),
-                    onUploadProgress: (info) => !textInput && updateProgressUI(info)
+                    body: bodyBlob,
+                    onUploadProgress: (info) => {
+                        if (textInput) return;
+                        // 0–99 during bytes upload; 100 (from upload.onload) → spinning "AI processing"
+                        updateProgressUI(info);
+                    }
                 });
 
-                if (data.error) throw new Error(data.error.message);
+                if (data.error) throw new Error(data.error.message || translations[currentLang].msgUnknownError);
                 if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
+                if (data.promptFeedback?.blockReason) throw new Error(translations[currentLang].msgModelStopped(data.promptFeedback.blockReason));
+                if (!data.candidates?.[0]) throw new Error(translations[currentLang].msgNoTextReturned);
+                if (data.candidates[0].finishReason && data.candidates[0].finishReason !== 'STOP') {
+                    throw new Error(translations[currentLang].msgModelStopped(data.candidates[0].finishReason));
+                }
                 throw new Error(translations[currentLang].msgNoTextReturned);
             }
 
@@ -1776,9 +2036,13 @@
                 if (!isTranslate) {
                     dom.convertIcon.classList.remove('hidden');
                     dom.convertIcon.classList.add('animate-spin');
-                    dom.progressSvg.classList.add('hidden');
-                    dom.infiniteSpinner.classList.remove('hidden');
-                    dom.resultLoaderText.textContent = '';
+                    // Start with progress ring at 0 so user always sees the upload UI
+                    dom.progressSvg.classList.remove('hidden');
+                    dom.infiniteSpinner.classList.add('hidden');
+                    if (dom.progressCirclePath) {
+                        dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
+                    }
+                    dom.resultLoaderText.textContent = currentLang === 'fa' ? 'در حال آماده‌سازی...' : 'Preparing...';
                 } else {
                     dom.translateIcon.classList.add('animate-spin');
                 }
@@ -1975,8 +2239,12 @@
                     if (value) localStorage.setItem('apiModel', value);
                 });
                 initCustomDropdown('language-select-dropdown');
-                initCustomDropdown('chunk-duration-dropdown');
-                initCustomDropdown('chunk-bitrate-dropdown');
+                initCustomDropdown('chunk-duration-dropdown', () => updateFfmpegPlanSummary());
+                initCustomDropdown('chunk-bitrate-dropdown', () => updateFfmpegPlanSummary());
+                initCustomDropdown('extract-audio-dropdown', () => updateFfmpegPlanSummary());
+                document.getElementById('ffmpeg-on-btn')?.addEventListener('click', () => setFfmpegMaster(true));
+                document.getElementById('ffmpeg-off-btn')?.addEventListener('click', () => setFfmpegMaster(false));
+                updateFfmpegPlanSummary();
                 initCustomDropdown('translate-mode-dropdown', (value) => {
                     updateProcessButtonIcon();
                     if (value === 'format') {
@@ -2034,18 +2302,26 @@
 
                     try {
                         let finalResult = '';
-                        const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10);
-                        const bitrateKbps = parseInt(dom.chunkBitrateSelect.value, 10);
+                        const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10) || 0;
+                        const bitrateValue = dom.chunkBitrateSelect.value; // number string or "original"
+                        const extractEnabled = (dom.extractAudioOnlySelect?.value === '1');
                         const fileType = selectedFile.type.split('/')[0];
+                        const canUseFFmpeg = isChunkingSupported();
+                        const ffmpegMasterOn = document.getElementById('ffmpeg-on-btn')?.classList.contains('bg-sky-500');
+                        // FFmpeg when master On AND COI available AND (chunking OR extract)
+                        const useFFmpeg = ffmpegMasterOn && canUseFFmpeg && (fileType === 'audio' || fileType === 'video') && (chunkSeconds > 0 || extractEnabled);
 
-                        if ((fileType === 'audio' || fileType === 'video') && chunkSeconds > 0) {
-                            // Slice audio into chunks with FFmpeg.wasm
-                            const chunks = await sliceAudioFileFFmpeg(selectedFile, chunkSeconds, bitrateKbps);
+                        if (useFFmpeg && chunkSeconds > 0) {
+                            const chunks = await sliceAudioFileFFmpeg(selectedFile, chunkSeconds, bitrateValue);
 
                             if (chunks.length > 1) {
                                 for (let i = 0; i < chunks.length; i++) {
                                     currentChunkInfo = { current: i + 1, total: chunks.length };
-                                    dom.resultLoaderText.textContent = translations[currentLang].uploadingChunkPrefix(i + 1, chunks.length) + translations[currentLang].msgProcessingChunk(i + 1, chunks.length);
+                                    // Reset progress UI so spinner + % show for every chunk upload
+                                    dom.progressSvg.classList.remove('hidden');
+                                    dom.infiniteSpinner.classList.add('hidden');
+                                    dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
+                                    updateProgressUI({ percent: 0, uploadedMB: '0.00', totalMB: (chunks[i].size / (1024 * 1024)).toFixed(2), speedMBps: '0.00', eta: '—' });
                                     const chunkResult = await callGenericAPI(getPrompt('transcribe'), chunks[i]);
                                     addChunkResultBox(i + 1, chunks.length, chunkResult);
                                     finalResult += (finalResult ? '\n\n' : '') + chunkResult;
@@ -2056,10 +2332,23 @@
                                 dom.outputText.value = finalResult;
                                 dom.chunksOutputWrapper.open = false;
                             } else {
+                                currentChunkInfo = null;
+                                dom.progressSvg.classList.remove('hidden');
+                                dom.infiniteSpinner.classList.add('hidden');
+                                dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
                                 finalResult = await callGenericAPI(getPrompt('transcribe'), chunks[0]);
                                 dom.outputText.value = finalResult;
                             }
+                        } else if (useFFmpeg && extractEnabled) {
+                            // Chunk disabled, but Auto Extract enabled → compress whole file once
+                            const compressed = await extractAudioFFmpeg(selectedFile, bitrateValue);
+                            dom.progressSvg.classList.remove('hidden');
+                            dom.infiniteSpinner.classList.add('hidden');
+                            dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
+                            finalResult = await callGenericAPI(getPrompt('transcribe'), compressed);
+                            dom.outputText.value = finalResult;
                         } else {
+                            // No FFmpeg: send original file as-is
                             finalResult = await callGenericAPI(getPrompt('transcribe'), selectedFile);
                             dom.outputText.value = finalResult;
                         }
@@ -2071,7 +2360,15 @@
 
                     } catch (error) {
                         console.error('API / Processing Error:', error);
-                        const errorText = error.message || translations[currentLang].msgUnknownError;
+                        const msg = (error.message || '').toLowerCase();
+                        let errorText = error.message || translations[currentLang].msgUnknownError;
+                        if (msg.includes('quota') || msg.includes('rate') || msg.includes('limit') || msg.includes('resource_exhausted')) {
+                            errorText = currentLang === 'fa' ? 'سهمیه یا محدودیت نرخ درخواست این مدل تمام شده یا سرورها شلوغ هستند. لطفاً بعداً تلاش کنید یا مدل دیگری انتخاب کنید.' : 'Quota / rate limit reached or servers are busy for this model. Try later or pick another model.';
+                        } else if (msg.includes('not support') || msg.includes('unsupported') || msg.includes('does not have') || msg.includes('not enabled')) {
+                            errorText = currentLang === 'fa' ? 'مدل انتخاب‌شده از این نوع محتوا پشتیبانی نمی‌کند. مدل دیگری را امتحان کنید.' : 'The selected model does not support this content type. Please choose another model.';
+                        } else if (msg.includes('api key') || msg.includes('permission') || msg.includes('unauthorized') || msg.includes('401') || msg.includes('403')) {
+                            errorText = currentLang === 'fa' ? 'کلید API نامعتبر یا بدون دسترسی است. کلید را بررسی کنید.' : 'Invalid API key or insufficient permissions. Please check your key.';
+                        }
                         showMessage('msgApiErrorTitle', errorText, true, undefined, true);
                         dom.outputText.value = errorText;
                     } finally {
@@ -2081,16 +2378,62 @@
                 });
 
                 dom.translateBtn.addEventListener('click', async () => {
-                    const source = dom.sourceResultRadio.checked ? dom.outputText.value.trim() : dom.translateInputArea.value.trim();
+                    const useResult = document.getElementById('source-result').classList.contains('bg-sky-500');
+                    const source = useResult ? dom.outputText.value.trim() : dom.translateInputArea.value.trim();
                     if (!source) {
                         showMessage('msgAttentionTitle', 'msgNoTextToTranslate', false);
                         return;
                     }
+                    const selectedTones = Array.from(document.querySelectorAll('.tone-chip.selected')).map(el => el.getAttribute('data-value'));
+                    if (selectedTones.length === 0) selectedTones.push('neutral');
+
                     startLoading(true);
+                    const tonesWrapper = document.getElementById('tones-output-wrapper');
+                    const tonesList = document.getElementById('tones-output-list');
+                    if (tonesWrapper) {
+                        tonesWrapper.classList.add('hidden');
+                        tonesList.innerHTML = '';
+                    }
                     try {
-                        const result = await callGenericAPI(getPrompt('translate'), null, source);
-                        dom.translateOutputArea.value = result;
-                        lastTranslation = { input: source, output: result, mode: dom.translateModeSelect.value };
+                        let combined = '';
+                        const results = [];
+                        for (let i = 0; i < selectedTones.length; i++) {
+                            const tone = selectedTones[i];
+                            const toneName = translations[currentLang]['tone' + tone.charAt(0).toUpperCase() + tone.slice(1)] || tone;
+                            if (selectedTones.length > 1) {
+                                dom.translateLoader.querySelector('iconify-icon')?.classList.add('animate-spin');
+                            }
+                            const result = await callGenericAPI(getPrompt('translate', tone), null, source);
+                            results.push({ tone, toneName, text: result });
+                            combined += (combined ? '\n\n--- ' + toneName + ' ---\n\n' : '') + result;
+                        }
+                        dom.translateOutputArea.value = combined;
+                        if (selectedTones.length > 1 && tonesWrapper) {
+                            tonesWrapper.classList.remove('hidden');
+                            tonesWrapper.open = false;
+                            results.forEach(r => {
+                                const box = document.createElement('div');
+                                box.className = 'h-[200px] flex flex-col bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-3';
+                                const header = document.createElement('div');
+                                header.className = 'flex justify-between items-center mb-1.5 flex-shrink-0';
+                                const title = document.createElement('span');
+                                title.className = 'text-xs font-semibold text-sky-600 dark:text-sky-400';
+                                title.textContent = translations[currentLang].toneBoxLabel(r.toneName);
+                                const copyBtn = document.createElement('button');
+                                copyBtn.innerHTML = `<iconify-icon icon="mdi:content-copy" width="16" height="16"></iconify-icon>`;
+                                copyBtn.className = 'inline-flex items-center justify-center text-slate-500 hover:text-sky-500';
+                                copyBtn.onclick = () => copyTextToClipboard(r.text);
+                                header.appendChild(title);
+                                header.appendChild(copyBtn);
+                                const body = document.createElement('p');
+                                body.className = 'flex-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap overflow-y-auto';
+                                body.textContent = r.text;
+                                box.appendChild(header);
+                                box.appendChild(body);
+                                tonesList.appendChild(box);
+                            });
+                        }
+                        lastTranslation = { input: source, output: combined, mode: dom.translateModeSelect.value, tones: selectedTones };
                         localStorage.setItem('lastTranslation', JSON.stringify(lastTranslation));
                         translationHistory.unshift(lastTranslation);
                         saveHistory('translation');
@@ -2104,8 +2447,38 @@
                     }
                 });
 
-                dom.sourceResultRadio.addEventListener('change', () => dom.translateInputContainerWrapper.classList.add('hidden'));
-                dom.sourceManualRadio.addEventListener('change', () => dom.translateInputContainerWrapper.classList.remove('hidden'));
+                function setSourceToggle(mode) {
+                    const resultBtn = document.getElementById('source-result');
+                    const manualBtn = document.getElementById('source-manual');
+                    const activeCls = ['bg-sky-500', 'text-white'];
+                    const inactiveCls = ['text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600'];
+                    [resultBtn, manualBtn].forEach(btn => {
+                        activeCls.forEach(c => btn.classList.remove(c));
+                        inactiveCls.forEach(c => btn.classList.remove(...c.split(' ').filter(Boolean)));
+                        btn.classList.remove('bg-sky-500', 'text-white');
+                        btn.classList.add('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600');
+                    });
+                    const active = mode === 'result' ? resultBtn : manualBtn;
+                    active.classList.remove('text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600');
+                    active.classList.add('bg-sky-500', 'text-white');
+                    if (mode === 'result') dom.translateInputContainerWrapper.classList.add('hidden');
+                    else dom.translateInputContainerWrapper.classList.remove('hidden');
+                }
+                document.getElementById('source-result').addEventListener('click', () => setSourceToggle('result'));
+                document.getElementById('source-manual').addEventListener('click', () => setSourceToggle('manual'));
+
+                document.querySelectorAll('.tone-chip').forEach(chip => {
+                    chip.addEventListener('click', () => {
+                        chip.classList.toggle('selected');
+                        if (chip.classList.contains('selected')) {
+                            chip.classList.add('bg-sky-500', 'text-white', 'border-sky-500');
+                            chip.classList.remove('bg-slate-50', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300', 'border-slate-300', 'dark:border-slate-600');
+                        } else {
+                            chip.classList.remove('bg-sky-500', 'text-white', 'border-sky-500');
+                            chip.classList.add('bg-slate-50', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300', 'border-slate-300', 'dark:border-slate-600');
+                        }
+                    });
+                });
 
                 dom.restoreBtn.addEventListener('click', () => {
                     if (lastResult) {

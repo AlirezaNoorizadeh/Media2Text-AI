@@ -24,6 +24,25 @@ if (typeof window === 'undefined') {
 
     self.addEventListener("fetch", function (event) {
         const r = event.request;
+
+        // Don't proxy cross-origin POST/PUT/PATCH requests (e.g. file uploads sent to an
+        // AI provider's API) through this service worker. Routing a request with a body
+        // through event.respondWith(fetch(request)) forces the whole body to be buffered
+        // and handed to the SW's own internal fetch() before it goes out on the wire, which
+        // breaks the browser's real-time XMLHttpRequest/upload progress events: instead of
+        // ticking up gradually, "loaded" jumps straight from 0 to the final value the moment
+        // the SW's fetch() resolves, so the UI looks stuck at 0% and then the result just
+        // appears. These requests don't need COOP/COEP/CORP header rewriting anyway (that's
+        // only relevant for subresource loads that participate in cross-origin isolation), so
+        // it's safe to just let the browser handle them natively.
+        let requestOrigin = null;
+        try { requestOrigin = new URL(r.url).origin; } catch (e) { /* relative/opaque URL, ignore */ }
+        const isCrossOrigin = requestOrigin && requestOrigin !== self.location.origin;
+        const hasBody = r.method !== "GET" && r.method !== "HEAD";
+        if (isCrossOrigin && hasBody) {
+            return;
+        }
+
         if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
             return;
         }

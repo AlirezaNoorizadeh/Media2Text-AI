@@ -1,194 +1,192 @@
+# 📑 Content-to-Text Converter
 
-# Content-to-Text-AI-Converter 🎯
+A modern, multilingual, browser-based tool for converting **audio**, **image**, and **video** files into text using AI-powered transcription, OCR, translation, and formatting — all running client-side with optional FFmpeg.wasm chunking for large media files.
 
-A modern, multilingual tool for converting audio, image, and video files to text with AI-powered transcription and translation capabilities, all in a single HTML file.
+<p align="center">
+  <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg" alt="PRs Welcome">
+  <img src="https://img.shields.io/badge/Platform-Chromium%20%7C%20Edge-4285F4?logo=googlechrome&logoColor=white" alt="Platform Support">
+  <img src="https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnu-bash&logoColor=white" alt="Bash">
+  <img src="https://img.shields.io/badge/Feature-FFmpeg.wasm%20%7C%20Chunking%20%7C%20COI-orange" alt="FFmpeg COI Support">
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+  </a>
+</p>
 
 ---
 
 ## 🚀 Getting Started
 
-### Single File Structure
+### Project Structure
 ```
-Content-to-Text-AI-Converter.html    # Complete standalone application (HTML+CSS+JS)
+index.html              # Main application (HTML + CSS + JS)
+coi-serviceworker.js    # Required for SharedArrayBuffer / FFmpeg.wasm chunking
 ```
 
-## Installation
-### Running the Application:
+> **Important:** Both files must be served from the **same origin**.  
+> Opening `index.html` directly via `file://` disables FFmpeg chunking because `SharedArrayBuffer` is unavailable without Cross-Origin Isolation.
 
-#### Option 1: Direct File Access (Simplest)
-1. Double-click the HTML file in your file explorer
-2. Opens directly in browser (file:// protocol)
+### Running Locally (Recommended)
 
-#### Option 2: With Local Server (Recommended)
-Use any local server method:
-- VS Code Live Server
-- Python http.server
-- Node.js http-server
-
+#### Option 1 — Python (built-in)
 ```bash
-# Example with Python:
+# From the project directory
 python -m http.server 8000
+# or
+python3 -m http.server 8000
 ```
-Then open: `http://localhost:8000/Content-to-Text-AI-Converter.html`
+Then open: **http://localhost:8000/**
+
+#### Option 2 — VS Code / Cursor (Live Server)
+1. Install the **Live Server** extension.
+2. Right-click `index.html` → **Open with Live Server**.
+3. The page opens on a local HTTP port (usually `http://127.0.0.1:5500`).
+
+#### Option 3 — Node.js
+```bash
+npx serve .
+# or
+npx http-server -p 8000
+```
+Then open the URL shown in the terminal (e.g. `http://localhost:8000`).
+
+#### Option 4 — Any static file server
+Any HTTP server that serves the two files from the same directory works (Nginx, Caddy, `php -S`, etc.).
+
+### Why `coi-serviceworker.js` is required
+FFmpeg.wasm needs `SharedArrayBuffer` for efficient audio/video chunking. Browsers only expose `SharedArrayBuffer` when the page is **Cross-Origin Isolated** (COOP + COEP headers).  
+
+The included `coi-serviceworker.js` automatically injects these headers when the page is served over `http://` or `https://`. Without this file (or without a proper local server), chunking is disabled and large files are sent in one piece.
+
+---
+
+## 🖼️ Preview
+
+| 1. API Settings | 2. Upload & Convert |
+|:---:|:---:|
+| ![API Settings](./assets/preview-api-settings.jpg) | ![Upload & Convert](./assets/preview-upload-convert.jpg) |
+
+| 3. Result | 4. Translate & Format |
+|:---:|:---:|
+| ![Result](./assets/preview-result.jpg) | ![Translate & Format](./assets/preview-translate-format.jpg) |
 
 ---
 
 ## 🌟 Core Features
 
 ### File Processing
-- 🎵 **Audio Transcription** - Convert speech to text from audio files
-- 🖼️ **Image Text Extraction** - Extract text from images and screenshots
-- 🎥 **Video Transcription** - Transcribe speech from video files
-- 📁 **Multiple Format Support** - MP3, WAV, MP4, AVI, PNG, JPG, and more
+- 🎵 **Audio Transcription** — Speech-to-text from audio files
+- 🖼️ **Image OCR** — Extract text from images and screenshots
+- 🎥 **Video Transcription** — Speech-to-text from video files
+- 📦 **FFmpeg.wasm Chunking** — Split long audio/video into manageable chunks (3–15 min) with optional bitrate control
+- 📁 **Wide Format Support** — MP3, WAV, OGG, M4A, FLAC, MP4, AVI, MOV, WEBM, MKV, PNG, JPG, WEBP, BMP, and more
 
 ### AI Integration
-- 🤖 **Multiple API Providers** - Gemini, OpenAI, and Claude support
-- 🎚️ **Intelligent Processing** - Automatic language detection
-- 🔄 **Retry Mechanism** - Automatic retries for API overloads
+- 🤖 **Multiple Providers** — Google Gemini, OpenAI, Anthropic Claude
+- 🎚️ **Auto Language Detection**
+- 🔄 **Smart Retry** on API overload / rate limits
+- 🔑 **Secure local storage** of API keys (never leave the browser)
 
 ### Translation & Formatting
-- 🌐 **Multi-language Translation** - Persian, English, Arabic, Spanish, French
-- 📝 **Text Formatting** - Structure and paragraph formatting options
-- 📚 **Bilingual Interface** - Full English/Persian support with RTL/LTR switching
+- 🌐 **Multi-language Translation** — Persian, English, Arabic, Spanish, French, and more
+- 📝 **Text Formatting** — Structure, paragraphs, and readability improvements
+- 🎨 **Tone Variants** (when supported by the model)
+- 📚 **Fully bilingual UI** — English / Persian with automatic RTL/LTR switching
 
 ### User Experience
-- 🌓 **Dark/Light Themes** - Theme customization
-- 💫 **Modern UI** - Glassmorphism design with glow effects
-- 📱 **Responsive Design** - Works on desktop and mobile devices
-- 📊 **History Management** - Save and manage transcription/translation history
+- 🌓 **Dark / Light themes**
+- 💫 **Modern glassmorphism UI** with subtle glow effects
+- 📱 **Fully responsive**
+- 📊 **Transcription & Translation History** with restore capability
+- 📋 **Copy, Expand, Clear, and Reset** actions
 
 ---
 
-## 🛠️ Technical Implementation
+## 🛠️ Technical Stack
 
-### Architecture
-- **Self-contained** single HTML file
-- **Vanilla JavaScript** with modern ES6+ features
-- **Tailwind CSS** for styling with custom dark/light themes
-- **Multiple AI API integrations** with fallback handling
+| Layer | Technology |
+|-------|------------|
+| Frontend | Single-page Vanilla JS (ES6+) |
+| Styling | Tailwind CSS (CDN) + custom dark/light themes |
+| Icons | Iconify |
+| Typography | Vazirmatn (Persian/Arabic optimized) |
+| Media Processing | FFmpeg.wasm 0.11.x |
+| Cross-Origin Isolation | coi-serviceworker.js |
+| AI Providers | Gemini, OpenAI, Claude REST APIs |
 
-### Supported APIs
-- **Google Gemini** - For image and text processing
-- **OpenAI** - For audio transcription and text processing  
-- **Anthropic Claude** - For image and text processing (images only)
-
-### Default Configuration
-- Gemini API provider
-- Auto-detect language
-- Dark theme
-- English interface
+### Supported APIs at a glance
+| Provider | Audio | Image | Video | Notes |
+|----------|-------|-------|-------|-------|
+| **Gemini** | ✅ | ✅ | ✅ | Default, excellent multimodal |
+| **OpenAI** | ✅ (Whisper) | ✅ | ✅ | Best pure audio quality |
+| **Claude** | ❌ | ✅ | ❌ | Strong vision, no audio/video |
 
 ---
 
 ## 🎮 How to Use
 
-### 1. API Setup
-1. Select your preferred API provider (Gemini, OpenAI, or Claude)
-2. Enter your API key in the designated field
-3. Click "Save & Activate" to enable the application
+1. **API Settings**  
+   Choose provider → paste API key → **Save & Activate**.
 
-### 2. File Upload
-4. Click the upload area or drag & drop your file
-5. Supported formats: images (PNG, JPG), audio (MP3, WAV), video (MP4, AVI)
+2. **Upload & Convert**  
+   Drag & drop or click to select a file.  
+   Optionally enable FFmpeg chunking and set duration / bitrate.  
+   Choose language (or leave Auto-detect) → **Convert to Text**.
 
-### 3. Conversion Settings
-6. Select content language or use auto-detection
-7. Click "Convert to Text" to process your file
+3. **Result**  
+   View the transcribed / extracted text.  
+   Expand individual chunks if chunking was used.  
+   Copy, clear, or save to history.
 
-### 4. Results & Translation
-8. View transcribed text in the results section
-9. Use translation tools to convert text to other languages
-10. Enable formatting for structured output
-11. Copy, clear, or restore results as needed
-
-### 5. History Management
-12. Access transcription and translation history
-13. Restore previous sessions
-14. Manage saved conversions
-
----
-
-## ⚙️ Settings Overview
-
-### API Providers
-- **Gemini**: Best for image text extraction and general processing
-- **OpenAI**: Best for audio transcription (Whisper) and comprehensive processing
-- **Claude**: Best for image processing (does not support audio/video)
-
-### Language Options
-- **Auto-detect**: Automatically identifies content language
-- **Manual selection**: Persian, English, Arabic, Spanish, French
-
-### Theme Options
-- **Dark theme** (default): Easy on eyes, reduced glare
-- **Light theme**: Bright interface for well-lit environments
-
-### Translation Features
-- **Real-time translation** between supported languages
-- **Text formatting** for improved readability
-- **Bidirectional support** for RTL and LTR languages
+4. **Translate & Format**  
+   Use the result as source (or paste custom text).  
+   Choose mode: Translate & Format / Translate Only / Format Only.  
+   Select target language → **Process**.
 
 ---
 
 ## 📋 Supported File Formats
 
-### Audio Files
-- MP3, WAV, OGG, M4A, FLAC
-
-### Video Files  
-- MP4, AVI, MOV, WEBM, MKV
-
-### Image Files
-- PNG, JPG, JPEG, WEBP, BMP
+**Audio:** MP3, WAV, OGG, M4A, FLAC  
+**Video:** MP4, AVI, MOV, WEBM, MKV  
+**Image:** PNG, JPG, JPEG, WEBP, BMP
 
 ---
 
 ## 🚦 Requirements
 
-### Browser Compatibility
-- Chrome 80+
-- Firefox 75+
-- Safari 13+
-- Edge 80+
-
-### Internet Connection
-- Required for API communication
-- Offline functionality limited to UI interactions
-
-### API Keys
-- Valid API key from selected provider required
-- Free tiers available for all supported APIs
+- Modern browser (Chrome 80+, Firefox 75+, Safari 13+, Edge 80+)
+- Internet connection (for AI API calls)
+- Valid API key from the chosen provider
+- Local HTTP server (required for FFmpeg chunking)
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Common Issues
-1. **API Key Errors** - Ensure your API key is valid and has sufficient credits
-2. **File Size Limits** - Large files may take longer to process
-3. **Network Issues** - Check internet connection for API calls
-4. **Browser Support** - Use updated browsers for best performance
-
-### Performance Tips
-- Use compressed audio/video formats for faster processing
-- For long recordings, consider splitting into smaller segments
-- Monitor API usage to avoid exceeding quota limits
+| Issue | Solution |
+|-------|----------|
+| FFmpeg / Chunking unavailable | Make sure you are serving via `http://localhost` (or any HTTP server) **and** `coi-serviceworker.js` is present next to `index.html`. |
+| API errors | Verify key validity, quota, and that the selected provider supports the file type. |
+| Large file timeout | Enable chunking or use a shorter chunk duration / lower bitrate. |
+| CORS / network errors | Ensure the page is not opened as `file://`. |
+| UI language / direction | Toggle the language switcher in the header. |
 
 ---
 
 ## 📜 License [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License**.
 
 ---
 
 ## 🙏 Credits
 
-Thanks to:
-- **Tailwind CSS** for modern styling framework
-- **Iconify** for comprehensive icon library
-- **Vazirmatn** for beautiful Persian/Arabic typography
+- [Tailwind CSS](https://tailwindcss.com) — utility-first styling
+- [Iconify](https://iconify.design) — icon set
+- [Vazirmatn](https://github.com/rastikerdar/vazirmatn) — Persian/Arabic typeface
+- [FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) — in-browser media processing
+- [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) — Cross-Origin Isolation helper
 
 ---
 
-> A comprehensive, professional-grade content conversion tool packed into a single portable HTML file with enterprise-level features and beautiful design.
+> A complete, professional-grade content-to-text conversion suite packed into a lightweight static web app with client-side FFmpeg processing and multi-provider AI support.

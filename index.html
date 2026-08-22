@@ -7,30 +7,90 @@
     <title data-key="pageTitle">Content-to-Text Converter</title>
 
     <!--
+        Content-Security-Policy (best effort). GitHub Pages doesn't let us set a real HTTP
+        response header, so this <meta> tag is the only CSP mechanism available here. It still
+        adds real defense-in-depth: 'unsafe-inline' is required because this is a single static
+        file with inline event handlers/scripts and no build step to add nonces/hashes, but
+        script-src/connect-src are still locked down to only this origin plus the exact CDN
+        fallback domains and API providers the app actually talks to — so even if an XSS bug
+        slipped in, it could not load a remote script from an attacker's domain, and any attempt
+        to exfiltrate data (e.g. localStorage keys) via fetch/XHR to an arbitrary attacker server
+        would be blocked by connect-src.
+        NOTE: 'frame-ancestors' is intentionally NOT included here — it has no effect in a <meta>
+        CSP (browsers just print a harmless console warning and ignore it); it only works as a
+        real HTTP response header, which GitHub Pages doesn't let us set.
+        NOTE: 'wasm-unsafe-eval' is included in script-src because FFmpeg's core is a WebAssembly
+        module — WebAssembly.instantiate() is blocked by CSP by default (it's grouped with eval()
+        for historical reasons), and this directive is the modern, narrow way to allow *only* WASM
+        compilation/instantiation without also allowing 'unsafe-eval' (which would additionally
+        permit eval()/Function() of arbitrary JS strings — a real XSS-severity risk we don't want).
+        NOTE: 'blob:' is included in script-src (and connect-src) because FFmpeg.wasm 0.11's
+        single-threaded loader fetches ffmpeg-core.js as text, wraps it in a Blob, runs it as a
+        real <script src="blob:..."> (a common technique to execute fetched code without a
+        bundler), and then internally fetch()es that same blob: URL again to read the wasm binary
+        — without 'blob:' in both directives, the browser silently blocks these steps and FFmpeg
+        processing hangs forever on "Loading FFmpeg WebAssembly engine..." or fails with "Failed
+        to fetch". This is a controlled, low-risk relaxation: the blob content always originates
+        from ffmpeg-core.js itself (fetched via connect-src, which is already locked to this
+        origin + the two pinned CDN fallbacks), never from arbitrary page data.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://cdn.tailwindcss.com https://code.iconify.design https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com https://api.openai.com https://generativelanguage.googleapis.com https://api.anthropic.com; base-uri 'self'; object-src 'none';">
+
+    <!--
         Enables SharedArrayBuffer (required by FFmpeg.wasm for the chunking feature) when this
         page is served without Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy headers
         set by the host (e.g. GitHub Pages, a plain static file server, etc). This file MUST sit
         next to this HTML file on the SAME origin, and the page must be loaded via http(s):// or
-        localhost — it will NOT work when the file is opened directly as file://.
+        localhost — it will NOT work when the file is opened directly as file:// (double-clicking
+        it in File Explorer). For local testing, run a static server from the project folder,
+        e.g. `python -m http.server 8000` then open http://localhost:8000 — not the file directly.
         Source: https://github.com/gzuidhof/coi-serviceworker (MIT license)
     -->
     <script src="coi-serviceworker.js"></script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <!--
+        Tailwind CSS — self-hosted first. vendor/tailwind.css is a static production build
+        (compiled with the Tailwind v3 CLI, scanning this exact HTML file for used classes),
+        which also fixes the "cdn.tailwindcss.com is not for production" performance issue since
+        it's no longer JIT-compiling in every visitor's browser. If the local file is ever
+        missing (e.g. you forgot to deploy the vendor/ folder), this falls back to the original
+        JIT CDN script so the page still works.
+        NOTE: if you add NEW Tailwind classes to this file later, rebuild vendor/tailwind.css
+        (see vendor/README.md) — otherwise those new classes will have no styles until the CDN
+        fallback happens to kick in.
+    -->
+    <link rel="stylesheet" href="vendor/tailwind.css" onerror="(function(){window.tailwind={config:{darkMode:'class'}};var s=document.createElement('script');s.src='https://cdn.tailwindcss.com';document.head.appendChild(s);})()">
 
-    <!-- FFmpeg.wasm for Browser-side Audio Processing & Chunking -->
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <!--
+        Offline icon data for the Iconify custom element below (mdi:* icons only — the exact set
+        this page uses, extracted from the @iconify-json/mdi npm package; source copy kept at
+        vendor/icons-mdi.json for reference/regeneration). Without this, iconify-icon's default
+        behavior is to fetch each icon's SVG data at runtime from Iconify's public API
+        (api.iconify.design / api.unisvg.com / api.simplesvg.com) — which (a) defeats the point of
+        self-hosting, (b) doesn't work offline, and (c) gets blocked by this page's own CSP
+        connect-src, so icons would silently fail to render. `window.IconifyPreload` is read by
+        iconify-icon.min.js right when it loads and registers these icons locally before anything
+        on the page asks for one, so no network request for icon data is ever made.
+        NOTE: if you add a NEW mdi:xxx icon to this page later, add its entry here too (or the new
+        icon just won't render, since the public API is blocked by CSP) — see vendor/README.md.
+    -->
+    <script>window.IconifyPreload=[{"prefix":"mdi","width":24,"height":24,"icons":{"alert-outline":{"body":"<path fill=\"currentColor\" d=\"M12 2L1 21h22M12 6l7.53 13H4.47M11 10v4h2v-4m-2 6v2h2v-2\"/>"},"arrow-collapse-all":{"body":"<path fill=\"currentColor\" d=\"m19.5 3.09l1.41 1.41l-4.5 4.5H20v2h-7V4h2v3.59zm1.41 16.41l-1.41 1.41l-4.5-4.5V20h-2v-7h7v2h-3.59zM4.5 3.09L9 7.59V4h2v7H4V9h3.59l-4.5-4.5zM3.09 19.5l4.5-4.5H4v-2h7v7H9v-3.59l-4.5 4.5z\"/>"},"arrow-expand-all":{"body":"<path fill=\"currentColor\" d=\"m9.5 13.09l1.41 1.41l-4.5 4.5H10v2H3v-7h2v3.59zm1.41-3.59L9.5 10.91L5 6.41V10H3V3h7v2H6.41zm3.59 3.59l4.5 4.5V14h2v7h-7v-2h3.59l-4.5-4.5zM13.09 9.5l4.5-4.5H14V3h7v7h-2V6.41l-4.5 4.5z\"/>"},"check-circle-outline":{"body":"<path fill=\"currentColor\" d=\"M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10s10-4.5 10-10S17.5 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m4.59-12.42L10 14.17l-2.59-2.58L6 13l4 4l8-8z\"/>"},"chevron-down":{"body":"<path fill=\"currentColor\" d=\"M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6z\"/>"},"chevron-right":{"body":"<path fill=\"currentColor\" d=\"M8.59 16.58L13.17 12L8.59 7.41L10 6l6 6l-6 6z\"/>"},"close":{"body":"<path fill=\"currentColor\" d=\"M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z\"/>"},"cloud-upload-outline":{"body":"<path fill=\"currentColor\" d=\"M6.5 20q-2.28 0-3.89-1.57Q1 16.85 1 14.58q0-1.95 1.17-3.48q1.18-1.53 3.08-1.95q.63-2.3 2.5-3.72Q9.63 4 12 4q2.93 0 4.96 2.04Q19 8.07 19 11q1.73.2 2.86 1.5q1.14 1.28 1.14 3q0 1.88-1.31 3.19T18.5 20H13q-.82 0-1.41-.59Q11 18.83 11 18v-5.15L9.4 14.4L8 13l4-4l4 4l-1.4 1.4l-1.6-1.55V18h5.5q1.05 0 1.77-.73q.73-.72.73-1.77t-.73-1.77Q19.55 13 18.5 13H17v-2q0-2.07-1.46-3.54Q14.08 6 12 6Q9.93 6 8.46 7.46Q7 8.93 7 11h-.5q-1.45 0-2.47 1.03Q3 13.05 3 14.5T4.03 17q1.02 1 2.47 1H9v2m3-7\"/>"},"content-copy":{"body":"<path fill=\"currentColor\" d=\"M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12z\"/>"},"delete-outline":{"body":"<path fill=\"currentColor\" d=\"M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM8 9h8v10H8zm7.5-5l-1-1h-5l-1 1H5v2h14V4z\"/>"},"earth":{"body":"<path fill=\"currentColor\" d=\"M17.9 17.39c-.26-.8-1.01-1.39-1.9-1.39h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41a7.984 7.984 0 0 1 2.9 12.8M11 19.93c-3.95-.49-7-3.85-7-7.93c0-.62.08-1.22.21-1.79L9 15v1a2 2 0 0 0 2 2m1-16A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2\"/>"},"eraser":{"body":"<path fill=\"currentColor\" d=\"m16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.01 4.01 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0M4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53l-4.95-4.95z\"/>"},"eye-off-outline":{"body":"<path fill=\"currentColor\" d=\"M2 5.27L3.28 4L20 20.72L18.73 22l-3.08-3.08c-1.15.38-2.37.58-3.65.58c-5 0-9.27-3.11-11-7.5c.69-1.76 1.79-3.31 3.19-4.54zM12 9a3 3 0 0 1 3 3a3 3 0 0 1-.17 1L11 9.17A3 3 0 0 1 12 9m0-4.5c5 0 9.27 3.11 11 7.5a11.8 11.8 0 0 1-4 5.19l-1.42-1.43A9.86 9.86 0 0 0 20.82 12A9.82 9.82 0 0 0 12 6.5c-1.09 0-2.16.18-3.16.5L7.3 5.47c1.44-.62 3.03-.97 4.7-.97M3.18 12A9.82 9.82 0 0 0 12 17.5c.69 0 1.37-.07 2-.21L11.72 15A3.064 3.064 0 0 1 9 12.28L5.6 8.87c-.99.85-1.82 1.91-2.42 3.13\"/>"},"eye-outline":{"body":"<path fill=\"currentColor\" d=\"M12 9a3 3 0 0 1 3 3a3 3 0 0 1-3 3a3 3 0 0 1-3-3a3 3 0 0 1 3-3m0-4.5c5 0 9.27 3.11 11 7.5c-1.73 4.39-6 7.5-11 7.5S2.73 16.39 1 12c1.73-4.39 6-7.5 11-7.5M3.18 12a9.821 9.821 0 0 0 17.64 0a9.821 9.821 0 0 0-17.64 0\"/>"},"format-align-center":{"body":"<path fill=\"currentColor\" d=\"M3 3h18v2H3zm4 4h10v2H7zm-4 4h18v2H3zm4 4h10v2H7zm-4 4h18v2H3z\"/>"},"format-align-left":{"body":"<path fill=\"currentColor\" d=\"M3 3h18v2H3zm0 4h12v2H3zm0 4h18v2H3zm0 4h12v2H3zm0 4h18v2H3z\"/>"},"format-align-right":{"body":"<path fill=\"currentColor\" d=\"M3 3h18v2H3zm6 4h12v2H9zm-6 4h18v2H3zm6 4h12v2H9zm-6 4h18v2H3z\"/>"},"github":{"body":"<path fill=\"currentColor\" d=\"M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5c.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34c-.46-1.16-1.11-1.47-1.11-1.47c-.91-.62.07-.6.07-.6c1 .07 1.53 1.03 1.53 1.03c.87 1.52 2.34 1.07 2.91.83c.09-.65.35-1.09.63-1.34c-2.22-.25-4.55-1.11-4.55-4.92c0-1.11.38-2 1.03-2.71c-.1-.25-.45-1.29.1-2.64c0 0 .84-.27 2.75 1.02c.79-.22 1.65-.33 2.5-.33s1.71.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02c.55 1.35.2 2.39.1 2.64c.65.71 1.03 1.6 1.03 2.71c0 3.82-2.34 4.66-4.57 4.91c.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2\"/>"},"history":{"body":"<path fill=\"currentColor\" d=\"M13.5 8H12v5l4.28 2.54l.72-1.21l-3.5-2.08zM13 3a9 9 0 0 0-9 9H1l3.96 4.03L9 12H6a7 7 0 0 1 7-7a7 7 0 0 1 7 7a7 7 0 0 1-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.9 8.9 0 0 0 13 21a9 9 0 0 0 9-9a9 9 0 0 0-9-9\"/>"},"information-outline":{"body":"<path fill=\"currentColor\" d=\"M11 9h2V7h-2m1 13c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8m0-18A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m-1 15h2v-6h-2z\"/>"},"license":{"body":"<path fill=\"currentColor\" d=\"M9 10a3.04 3.04 0 0 1 3-3a3.04 3.04 0 0 1 3 3a3.04 3.04 0 0 1-3 3a3.04 3.04 0 0 1-3-3m3 9l4 1v-3.08A7.54 7.54 0 0 1 12 18a7.54 7.54 0 0 1-4-1.08V20m4-16a5.78 5.78 0 0 0-4.24 1.74A5.78 5.78 0 0 0 6 10a5.78 5.78 0 0 0 1.76 4.23A5.78 5.78 0 0 0 12 16a5.78 5.78 0 0 0 4.24-1.77A5.78 5.78 0 0 0 18 10a5.78 5.78 0 0 0-1.76-4.26A5.78 5.78 0 0 0 12 4m8 6a8 8 0 0 1-.57 2.8A7.8 7.8 0 0 1 18 15.28V23l-6-2l-6 2v-7.72A7.9 7.9 0 0 1 4 10a7.68 7.68 0 0 1 2.33-5.64A7.73 7.73 0 0 1 12 2a7.73 7.73 0 0 1 5.67 2.36A7.68 7.68 0 0 1 20 10\"/>"},"link-variant":{"body":"<path fill=\"currentColor\" d=\"M10.59 13.41c.41.39.41 1.03 0 1.42c-.39.39-1.03.39-1.42 0a5.003 5.003 0 0 1 0-7.07l3.54-3.54a5.003 5.003 0 0 1 7.07 0a5.003 5.003 0 0 1 0 7.07l-1.49 1.49c.01-.82-.12-1.64-.4-2.42l.47-.48a2.98 2.98 0 0 0 0-4.24a2.98 2.98 0 0 0-4.24 0l-3.53 3.53a2.98 2.98 0 0 0 0 4.24m2.82-4.24c.39-.39 1.03-.39 1.42 0a5.003 5.003 0 0 1 0 7.07l-3.54 3.54a5.003 5.003 0 0 1-7.07 0a5.003 5.003 0 0 1 0-7.07l1.49-1.49c-.01.82.12 1.64.4 2.43l-.47.47a2.98 2.98 0 0 0 0 4.24a2.98 2.98 0 0 0 4.24 0l3.53-3.53a2.98 2.98 0 0 0 0-4.24a.973.973 0 0 1 0-1.42\"/>"},"loading":{"body":"<path fill=\"currentColor\" d=\"M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8\"/>"},"palette-outline":{"body":"<path fill=\"currentColor\" d=\"M12 22A10 10 0 0 1 2 12A10 10 0 0 1 12 2c5.5 0 10 4 10 9a6 6 0 0 1-6 6h-1.8c-.3 0-.5.2-.5.5c0 .1.1.2.1.3c.4.5.6 1.1.6 1.7c.1 1.4-1 2.5-2.4 2.5m0-18a8 8 0 0 0-8 8a8 8 0 0 0 8 8c.3 0 .5-.2.5-.5c0-.2-.1-.3-.1-.4c-.4-.5-.6-1-.6-1.6c0-1.4 1.1-2.5 2.5-2.5H16a4 4 0 0 0 4-4c0-3.9-3.6-7-8-7m-5.5 6c.8 0 1.5.7 1.5 1.5S7.3 13 6.5 13S5 12.3 5 11.5S5.7 10 6.5 10m3-4c.8 0 1.5.7 1.5 1.5S10.3 9 9.5 9S8 8.3 8 7.5S8.7 6 9.5 6m5 0c.8 0 1.5.7 1.5 1.5S15.3 9 14.5 9S13 8.3 13 7.5S13.7 6 14.5 6m3 4c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5s-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5\"/>"},"power":{"body":"<path fill=\"currentColor\" d=\"m16.56 5.44l-1.45 1.45A5.97 5.97 0 0 1 18 12a6 6 0 0 1-6 6a6 6 0 0 1-6-6c0-2.17 1.16-4.06 2.88-5.12L7.44 5.44A7.96 7.96 0 0 0 4 12a8 8 0 0 0 8 8a8 8 0 0 0 8-8c0-2.72-1.36-5.12-3.44-6.56M13 3h-2v10h2\"/>"},"refresh":{"body":"<path fill=\"currentColor\" d=\"M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 0 0-8 8a8 8 0 0 0 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18a6 6 0 0 1-6-6a6 6 0 0 1 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z\"/>"},"restore":{"body":"<path fill=\"currentColor\" d=\"M13 3a9 9 0 0 0-9 9H1l3.89 3.89l.07.14L9 12H6a7 7 0 0 1 7-7a7 7 0 0 1 7 7a7 7 0 0 1-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.9 8.9 0 0 0 13 21a9 9 0 0 0 9-9a9 9 0 0 0-9-9\"/>"},"translate":{"body":"<path fill=\"currentColor\" d=\"m12.87 15.07l-2.54-2.51l.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35C8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5l3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7l1.62-4.33L19.12 17z\"/>"},"tune-vertical":{"body":"<path fill=\"currentColor\" d=\"M7 3H5v6h2zm12 0h-2v10h2zM3 13h2v8h2v-8h2v-2H3zm12-6h-2V3h-2v4H9v2h6zm-4 14h2V11h-2zm4-6v2h2v4h2v-4h2v-2z\"/>"},"view-list-outline":{"body":"<path fill=\"currentColor\" d=\"M3 5v14h17V5zm4 2v2H5V7zm-2 6v-2h2v2zm0 2h2v2H5zm13 2H9v-2h9zm0-4H9v-2h9zm0-4H9V7h9z\"/>"},"weather-night":{"body":"<path fill=\"currentColor\" d=\"m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3zm3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31\"/>"},"white-balance-sunny":{"body":"<path fill=\"currentColor\" d=\"m3.55 19.09l1.41 1.41l1.8-1.79l-1.42-1.42M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6s6-2.69 6-6c0-3.32-2.69-6-6-6m8 7h3v-2h-3m-2.76 7.71l1.8 1.79l1.41-1.41l-1.79-1.8M20.45 5l-1.41-1.4l-1.8 1.79l1.42 1.42M13 1h-2v3h2M6.76 5.39L4.96 3.6L3.55 5l1.79 1.81zM1 13h3v-2H1m12 9h-2v3h2\"/>"}}}];</script>
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
-    </script>
+    <!--
+        Iconify custom element — self-hosted first, CDN fallback if vendor/ is missing.
+        No integrity/crossorigin here: this file is same-origin (your own repo), so there's no
+        supply-chain risk to check against, and crossorigin="anonymous" would force a CORS-mode
+        fetch that fails outright when the page is opened as file:// (and is pointless overhead
+        even on a real http(s) origin, since same-origin requests don't need CORS at all).
+        integrity IS kept on the CDN fallback below, since that one really is a third-party origin.
+    -->
+    <script src="vendor/iconify-icon.min.js" onerror="var s=document.createElement('script');s.integrity='sha384-qTfHn+IPeeeM6XmMt6iJk2HWDZqa0vNdMolC6GqYMYtLoEtdRQi951Pjzp03tRbf';s.crossOrigin='anonymous';s.src='https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js';document.head.appendChild(s);"></script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FFmpeg.wasm for Browser-side Audio Processing & Chunking — self-hosted first, CDN fallback if vendor/ is missing. Same reasoning as Iconify above re: no integrity/crossorigin on the same-origin copy. -->
+    <script src="vendor/ffmpeg.min.js" onerror="var s=document.createElement('script');s.integrity='sha384-m5or9sW5FUT2WQbj3UthGceVpwo9zSgHKdCugYKHl19lyXPvwO/oQcmq8Fw0FfaA';s.crossOrigin='anonymous';s.src='https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js';document.head.appendChild(s);"></script>
+
+    <!-- Vazirmatn font — self-hosted first (vendor/fonts.css + vendor/fonts/*.woff2), Google Fonts CDN fallback if vendor/ is missing -->
+    <link rel="stylesheet" href="vendor/fonts.css" onerror="(function(){var l1=document.createElement('link');l1.rel='preconnect';l1.href='https://fonts.googleapis.com';var l2=document.createElement('link');l2.rel='preconnect';l2.href='https://fonts.gstatic.com';l2.crossOrigin='anonymous';var l3=document.createElement('link');l3.rel='stylesheet';l3.href='https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap';document.head.appendChild(l1);document.head.appendChild(l2);document.head.appendChild(l3);})()">
 
     <style>
         body {
@@ -468,6 +528,7 @@
                                 <iconify-icon id="infinite-spinner" icon="mdi:loading" class="animate-spin text-sky-500 absolute" width="50" height="50" dir="ltr"></iconify-icon>
                             </div>
                             <span id="result-loader-text" class="text-xs text-slate-500 dark:text-slate-400 font-semibold text-center"></span>
+                            <button id="cancel-processing-btn" type="button" class="mt-1 text-xs font-semibold text-red-500 hover:text-red-600 border border-red-300 dark:border-red-800 rounded-lg px-3 py-1 transition-colors" data-key="cancelBtn">Cancel</button>
                         </div>
                         <textarea id="output-text-area" class="min-h-[200px] hidden"></textarea>
                     </div>
@@ -712,7 +773,13 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const { createFFmpeg, fetchFile } = FFmpeg;
+            // FFmpeg is optional (only powers chunking/audio-extraction); if both the self-hosted
+            // vendor/ffmpeg.min.js AND the CDN fallback failed to load (e.g. no internet and the
+            // vendor/ folder is missing), destructuring `FFmpeg` directly would throw a
+            // ReferenceError here and silently break the ENTIRE app (every listener below would
+            // never get attached). Guard it so the rest of the page still works; chunking-related
+            // features degrade gracefully via isChunkingSupported()/useFFmpeg checks further down.
+            const { createFFmpeg, fetchFile } = (typeof FFmpeg !== 'undefined') ? FFmpeg : { createFFmpeg: null, fetchFile: null };
             let ffmpeg = null;
 
             function initCustomDropdown(dropdownId, onSelectCallback) {
@@ -858,6 +925,7 @@
                 progressSvg: document.getElementById('progress-svg'),
                 progressCirclePath: document.getElementById('progress-circle-path'),
                 infiniteSpinner: document.getElementById('infinite-spinner'),
+                cancelProcessingBtn: document.getElementById('cancel-processing-btn'),
                 translateBtn: document.getElementById('translate-btn'),
                 translateIcon: document.getElementById('translate-icon'),
                 translateModeSelect: document.getElementById('translate-mode-select'),
@@ -896,6 +964,9 @@
             };
 
             let selectedFile = null;
+            // Set at the start of a convert operation, cleared when it ends; xhrRequest below aborts
+            // the in-flight XHR when this controller's signal fires, and the Cancel button triggers it.
+            let currentAbortController = null;
             let activeExpandedTextArea = null;
             let lastResult = localStorage.getItem('lastResult') || '';
             let lastTranslation = JSON.parse(localStorage.getItem('lastTranslation') || '{}');
@@ -991,6 +1062,10 @@
                     msgNoModelsYet: "Enter your API key and click \"Save & Activate\" to load models.",
                     msgFetchingModels: "Fetching models...",
                     msgCopyError: "Failed to copy text.",
+                    cancelBtn: "Cancel",
+                    msgCancelled: "Processing was cancelled.",
+                    msgLargeFileWarning: (mb) => `Large file (${mb} MB) — encoding and uploading it may use a lot of memory and could crash the tab on mobile devices.`,
+                    msgRateLimitedRetry: (seconds) => `Rate limited by the provider — retrying in ${seconds}s...`,
                     msgUploading: (percent, uploaded, total, speed, eta) => `Uploading: ${percent}% (${uploaded} / ${total} MB) - Speed: ${speed} MB/s | Remaining: ${eta}`,
                     msgProcessingModel: "Uploading finished! Processing file with AI model...",
                     ffmpegTitle: "FFmpeg Audio/Video Processing",
@@ -1120,6 +1195,10 @@
                     msgNoModelsYet: "کلید API خود را وارد کرده و روی «ذخیره و فعال‌سازی» کلیک کنید تا مدل‌ها بارگذاری شوند.",
                     msgFetchingModels: "در حال دریافت مدل‌ها...",
                     msgCopyError: "کپی کردن متن با خطا مواجه شد.",
+                    cancelBtn: "لغو",
+                    msgCancelled: "پردازش لغو شد.",
+                    msgLargeFileWarning: (mb) => `فایل حجیم است (${mb} مگابایت) — انکود و آپلود آن ممکن است حافظه‌ی زیادی مصرف کند و در موبایل باعث کرش تب شود.`,
+                    msgRateLimitedRetry: (seconds) => `محدودیت نرخ درخواست از سمت سرویس‌دهنده — تلاش مجدد در ${seconds} ثانیه...`,
                     msgUploading: (percent, uploaded, total, speed, eta) => `در حال آپلود: ${percent}% (${uploaded} از ${total} مگابایت) - سرعت: ${speed} MB/s | زمان باقی‌مانده: ${eta}`,
                     msgProcessingModel: "آپلود تکمیل شد! مدل در حال پردازش فایل است...",
                     ffmpegTitle: "تنظیمات پردازش صوت/ویدیو با FFmpeg",
@@ -1249,7 +1328,11 @@
             }
 
             function isChunkingSupported() {
-                return typeof SharedArrayBuffer !== 'undefined' && window.crossOriginIsolated === true;
+                // Also require createFFmpeg to actually exist: if vendor/ffmpeg.min.js failed to
+                // load AND the CDN fallback also failed (e.g. offline + missing vendor/ folder),
+                // the COI/SharedArrayBuffer check alone would say "supported" and the code would
+                // later crash trying to call a null createFFmpeg.
+                return typeof SharedArrayBuffer !== 'undefined' && window.crossOriginIsolated === true && typeof createFFmpeg === 'function';
             }
 
             function applyChunkingAvailability() {
@@ -1345,11 +1428,21 @@
                 }
             }
 
+            // Files above this size get a warning: without FFmpeg chunking, the whole file is base64-encoded
+            // in memory (~33% larger than the original) alongside the original Blob, which can crash the
+            // tab on memory-constrained devices (mobile in particular).
+            const LARGE_FILE_WARNING_BYTES = 150 * 1024 * 1024; // 150 MB
+
             function handleFile(file) {
                 resetUpload();
                 selectedFile = file;
 
                 dom.dropZone.classList.add('hidden');
+
+                if (file.size > LARGE_FILE_WARNING_BYTES) {
+                    const mb = (file.size / (1024 * 1024)).toFixed(0);
+                    showMessage('msgAttentionTitle', translations[currentLang].msgLargeFileWarning(mb), false, undefined, true);
+                }
 
                 const fileType = file.type.split('/')[0];
                 let previewElement;
@@ -1400,8 +1493,13 @@
             // Pinned to the single-threaded 0.11.0 core build. The "latest" alias can resolve to
             // a multi-thread build that requires SharedArrayBuffer, which is unavailable without
             // cross-origin-isolation (COOP/COEP) headers on this page ("SharedArrayBuffer is not
-            // defined"). Multiple CDN mirrors are tried in case one is unreliable/blocked.
+            // defined"). Self-hosted vendor/ copy is tried first; CDN mirrors are the fallback if
+            // vendor/ is missing or fails to load.
+            // NOTE: must be an ABSOLUTE URL — ffmpeg.wasm 0.11's internal `new URL(corePath, base)`
+            // resolution uses a hardcoded build-time base for relative paths, so a plain relative
+            // 'vendor/ffmpeg-core.js' string would resolve incorrectly.
             const FFMPEG_CORE_SOURCES = [
+                new URL('vendor/ffmpeg-core.js', document.baseURI).href,
                 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
                 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
             ];
@@ -1622,8 +1720,9 @@
                 }
             }
 
-            // Real XHR upload progress only (same approach as the working older version)
-            function xhrRequest({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
+            // Real XHR upload progress only (same approach as the working older version).
+            // Single attempt — retry/backoff and cancellation are handled by the xhrRequest wrapper below.
+            function xhrRequestOnce({ url, method = 'POST', headers = {}, body, onUploadProgress }) {
                 return new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
                     xhr.open(method, url);
@@ -1678,13 +1777,69 @@
                                 const errData = JSON.parse(xhr.responseText);
                                 errorMsg = errData.error?.message || errorMsg;
                             } catch (e) { }
-                            reject(new Error(errorMsg || `HTTP Error: ${xhr.status}`));
+                            const err = new Error(errorMsg || `HTTP Error: ${xhr.status}`);
+                            err.status = xhr.status;
+                            err.retryAfter = xhr.getResponseHeader('Retry-After');
+                            reject(err);
                         }
                     };
 
                     xhr.onerror = () => reject(new Error('Network error occurred.'));
+                    xhr.onabort = () => {
+                        const err = new Error(translations[currentLang].msgCancelled);
+                        err.name = 'AbortError';
+                        reject(err);
+                    };
+
+                    if (currentAbortController) {
+                        if (currentAbortController.signal.aborted) {
+                            const err = new Error(translations[currentLang].msgCancelled);
+                            err.name = 'AbortError';
+                            reject(err);
+                            return;
+                        }
+                        currentAbortController.signal.addEventListener('abort', () => xhr.abort());
+                    }
+
                     xhr.send(body);
                 });
+            }
+
+            // Wraps xhrRequestOnce with automatic retry + exponential backoff for 429 (rate limit) and
+            // transient 502/503/504 (server busy) responses, honoring a Retry-After header when the
+            // provider sends one. Cancellation (AbortError) is never retried.
+            async function xhrRequest(options) {
+                const MAX_RETRIES = 2;
+                for (let attempt = 0; ; attempt++) {
+                    try {
+                        return await xhrRequestOnce(options);
+                    } catch (err) {
+                        if (err.name === 'AbortError') throw err;
+                        const isRetryable = err.status === 429 || err.status === 502 || err.status === 503 || err.status === 504;
+                        if (!isRetryable || attempt >= MAX_RETRIES) throw err;
+
+                        const retryAfterSec = parseFloat(err.retryAfter);
+                        const waitMs = !isNaN(retryAfterSec)
+                            ? retryAfterSec * 1000
+                            : Math.min(1000 * 2 ** attempt, 8000) + Math.random() * 300;
+
+                        if (dom.resultLoaderText) {
+                            dom.resultLoaderText.textContent = translations[currentLang].msgRateLimitedRetry(Math.ceil(waitMs / 1000));
+                        }
+
+                        await new Promise((resolve, reject) => {
+                            const timer = setTimeout(resolve, waitMs);
+                            if (currentAbortController) {
+                                currentAbortController.signal.addEventListener('abort', () => {
+                                    clearTimeout(timer);
+                                    const abortErr = new Error(translations[currentLang].msgCancelled);
+                                    abortErr.name = 'AbortError';
+                                    reject(abortErr);
+                                });
+                            }
+                        });
+                    }
+                }
             }
 
             function getModelPurposeInfo(modelId, provider) {
@@ -1711,8 +1866,10 @@
                     let models = [];
                     switch (provider) {
                         case 'gemini': {
-                            const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-                            const response = await fetch(url);
+                            // Key sent via the x-goog-api-key header (not ?key=...) so it never ends up in
+                            // browser history, proxy/access logs, or a Referrer header if this page is linked from.
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models`;
+                            const response = await fetch(url, { headers: { 'x-goog-api-key': apiKey } });
                             if (!response.ok) throw new Error('Failed to fetch Gemini models');
                             const data = await response.json();
                             models = data.models
@@ -1885,7 +2042,9 @@
             async function callGeminiAPI(prompt, file, textInput = null) {
                 const apiKey = localStorage.getItem('apiKey');
                 const apiModel = localStorage.getItem('apiModel') || 'gemini-2.5-flash';
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
+                // Key sent via the x-goog-api-key header (not ?key=...) so it never ends up in
+                // browser history, proxy/access logs, or a Referrer header if this page is linked from.
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent`;
 
                 let parts = [{ text: prompt }];
                 if (textInput) {
@@ -1920,7 +2079,7 @@
 
                 const data = await xhrRequest({
                     url,
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: bodyBlob,
                     onUploadProgress: (info) => {
                         if (textInput) return;
@@ -2112,11 +2271,23 @@
                 else if (align === 'left') dom.expandTextArea.dir = 'ltr';
             }
 
+            // Cap so localStorage (typically 5-10MB) doesn't fill up from an ever-growing, uncompressed history.
+            const MAX_HISTORY_ITEMS = 50;
+
+            // Wrapped in its own try/catch, separate from the result display, so that a full/unavailable
+            // localStorage (private browsing, quota exceeded, etc.) only logs an error instead of
+            // bubbling up and wiping out an already-successful transcription/translation result on screen.
             function saveHistory(type) {
-                if (type === 'transcription') {
-                    localStorage.setItem('transcriptionHistory', JSON.stringify(transcriptionHistory));
-                } else {
-                    localStorage.setItem('translationHistory', JSON.stringify(translationHistory));
+                try {
+                    if (type === 'transcription') {
+                        if (transcriptionHistory.length > MAX_HISTORY_ITEMS) transcriptionHistory.length = MAX_HISTORY_ITEMS;
+                        localStorage.setItem('transcriptionHistory', JSON.stringify(transcriptionHistory));
+                    } else {
+                        if (translationHistory.length > MAX_HISTORY_ITEMS) translationHistory.length = MAX_HISTORY_ITEMS;
+                        localStorage.setItem('translationHistory', JSON.stringify(translationHistory));
+                    }
+                } catch (err) {
+                    console.error('saveHistory failed (localStorage full or unavailable):', err);
                 }
             }
 
@@ -2141,7 +2312,14 @@
                     headerDiv.className = 'flex justify-between items-center mb-2';
                     const fileNameP = document.createElement('p');
                     fileNameP.className = 'text-sm font-semibold text-slate-800 dark:text-slate-200 truncate';
-                    fileNameP.innerHTML = `<span class="font-normal text-slate-500 dark:text-slate-400">${translations[currentLang].historyFileNameLabel}</span> ${item.fileName}`;
+                    // item.fileName comes straight from the user's uploaded file name (fully attacker-controlled).
+                    // Built with textContent/createElement instead of innerHTML so a malicious file name
+                    // (e.g. containing "<img src=x onerror=...>") can never execute as HTML/JS here.
+                    const fileNameLabelSpan = document.createElement('span');
+                    fileNameLabelSpan.className = 'font-normal text-slate-500 dark:text-slate-400';
+                    fileNameLabelSpan.textContent = translations[currentLang].historyFileNameLabel;
+                    fileNameP.textContent = ' ' + item.fileName;
+                    fileNameP.prepend(fileNameLabelSpan);
                     const controlsDiv = document.createElement('div');
                     controlsDiv.className = 'flex items-center gap-2 flex-shrink-0';
                     const copyBtn = document.createElement('button');
@@ -2300,6 +2478,8 @@
                     resetChunkResults();
                     dom.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+                    currentAbortController = new AbortController();
+
                     try {
                         let finalResult = '';
                         const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10) || 0;
@@ -2354,12 +2534,26 @@
                         }
 
                         lastResult = finalResult;
-                        localStorage.setItem('lastResult', finalResult);
+                        // Isolated so a full/unavailable localStorage can't wipe out the already-displayed
+                        // successful result by falling through to the outer catch block below.
+                        try {
+                            localStorage.setItem('lastResult', finalResult);
+                        } catch (storageErr) {
+                            console.error('Failed to persist lastResult to localStorage:', storageErr);
+                        }
                         transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult });
                         saveHistory('transcription');
 
                     } catch (error) {
                         console.error('API / Processing Error:', error);
+                        if (error.name === 'AbortError') {
+                            showToast('msgCancelled', false);
+                            dom.outputText.value = lastResult || '';
+                            currentAbortController = null;
+                            currentChunkInfo = null;
+                            stopLoading();
+                            return;
+                        }
                         const msg = (error.message || '').toLowerCase();
                         let errorText = error.message || translations[currentLang].msgUnknownError;
                         if (msg.includes('quota') || msg.includes('rate') || msg.includes('limit') || msg.includes('resource_exhausted')) {
@@ -2372,9 +2566,14 @@
                         showMessage('msgApiErrorTitle', errorText, true, undefined, true);
                         dom.outputText.value = errorText;
                     } finally {
+                        currentAbortController = null;
                         currentChunkInfo = null;
                         stopLoading();
                     }
+                });
+
+                dom.cancelProcessingBtn?.addEventListener('click', () => {
+                    if (currentAbortController) currentAbortController.abort();
                 });
 
                 dom.translateBtn.addEventListener('click', async () => {
@@ -2434,7 +2633,13 @@
                             });
                         }
                         lastTranslation = { input: source, output: combined, mode: dom.translateModeSelect.value, tones: selectedTones };
-                        localStorage.setItem('lastTranslation', JSON.stringify(lastTranslation));
+                        // Isolated for the same reason as lastResult above: a full/unavailable localStorage
+                        // must not wipe out the already-displayed successful translation result.
+                        try {
+                            localStorage.setItem('lastTranslation', JSON.stringify(lastTranslation));
+                        } catch (storageErr) {
+                            console.error('Failed to persist lastTranslation to localStorage:', storageErr);
+                        }
                         translationHistory.unshift(lastTranslation);
                         saveHistory('translation');
                     } catch (error) {

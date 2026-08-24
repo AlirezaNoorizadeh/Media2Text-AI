@@ -104,9 +104,10 @@ The included `coi-serviceworker.js` automatically injects these headers when the
 - 🖼️ **Image OCR** — Extract text from images and screenshots
 - 🎥 **Video Transcription** — Speech-to-text from video files
 - 📦 **FFmpeg.wasm Chunking** — Split long audio/video into manageable chunks (with optional overlap and bitrate control)
+- 🎧 **Auto Extract & Compress (MP3)** — When enabled, chunks are audio-only MP3; when disabled, chunks keep the original file format (e.g. MP4 → MP4)
 - ✂️ **Chunk selection panel** — After slicing, choose which chunks to send to the API (select all / none / individual)
-- ⬇️ **Per-chunk download** — Download any chunk as MP3 with a descriptive filename:  
-  `originalname_chunkN_(start-end).mp3`
+- ⬇️ **Per-chunk download** — Download any chunk with a descriptive filename:  
+  `originalname_chunkN_(start-end).<ext>` (extension matches the chunk format)
 - ⏹️ **Cancel anytime** — Abort during upload/API calls; partial multi-chunk results are kept when available
 - 📁 **Wide Format Support** — MP3, WAV, OGG, M4A, FLAC, MP4, AVI, MOV, WEBM, MKV, PNG, JPG, WEBP, BMP, and more
 
@@ -160,6 +161,7 @@ The included `coi-serviceworker.js` automatically injects these headers when the
 2. **Upload & Convert**  
    Drag & drop or click to select a file.  
    Optionally enable FFmpeg chunking and set duration / overlap / bitrate.  
+   Toggle **Auto Extract & Compress Audio (MP3)** — on = MP3 audio chunks, off = keep original format.  
    Choose language (or leave Auto-detect) → **Convert to Text**.
 
 3. **Chunk selection** (when the file is split into more than one chunk)  

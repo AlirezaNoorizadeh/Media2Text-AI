@@ -1156,7 +1156,9 @@
                     ffmpegOn: "On",
                     ffmpegOff: "Off",
                     ffmpegPlanPassthrough: "FFmpeg will not modify the file. The original file will be uploaded as-is.",
-                    ffmpegPlanChunk: (mins, bitrate, extract) => `FFmpeg will split the file into ~${mins}-minute chunks as MP3${extract ? ' (audio extracted)' : ''}, bitrate: ${bitrate}, then each chunk is sent to the AI.`,
+                    ffmpegPlanChunk: (mins, bitrate, extract) => extract
+                        ? `FFmpeg will split the file into ~${mins}-minute MP3 audio chunks (video stripped), bitrate: ${bitrate}, then each chunk is sent to the AI.`
+                        : `FFmpeg will split the file into ~${mins}-minute chunks keeping the original format (stream copy), then each chunk is sent to the AI.`,
                     ffmpegPlanExtractOnly: (bitrate) => `FFmpeg will extract/compress the whole file to a single MP3 (bitrate: ${bitrate}) and send it without chunking.`,
                     ffmpegPlanOff: "FFmpeg is Off. The original file will be uploaded without any processing.",
                     msgEncodingFile: "Preparing file data...",
@@ -1309,7 +1311,9 @@
                     ffmpegOn: "روشن",
                     ffmpegOff: "خاموش",
                     ffmpegPlanPassthrough: "FFmpeg تغییری روی فایل نمی‌دهد و خود فایل اصلی ارسال خواهد شد.",
-                    ffmpegPlanChunk: (mins, bitrate, extract) => `FFmpeg فایل را به چانک‌های حدود ${mins} دقیقه‌ای با فرمت MP3${extract ? ' (استخراج صدا)' : ''} و بیت‌ریت ${bitrate} تبدیل می‌کند و هر چانک جداگانه به هوش مصنوعی ارسال می‌شود.`,
+                    ffmpegPlanChunk: (mins, bitrate, extract) => extract
+                        ? `FFmpeg فایل را به چانک‌های حدود ${mins} دقیقه‌ای MP3 (فقط صدا) با بیت‌ریت ${bitrate} تبدیل می‌کند و هر چانک جداگانه به هوش مصنوعی ارسال می‌شود.`
+                        : `FFmpeg فایل را به چانک‌های حدود ${mins} دقیقه‌ای با حفظ فرمت اصلی (کپی استریم) تقسیم می‌کند و هر چانک جداگانه به هوش مصنوعی ارسال می‌شود.`,
                     ffmpegPlanExtractOnly: (bitrate) => `FFmpeg کل فایل را یک‌بار به MP3 با بیت‌ریت ${bitrate} تبدیل/استخراج می‌کند و بدون چانک‌بندی ارسال می‌کند.`,
                     ffmpegPlanOff: "FFmpeg خاموش است. فایل اصلی بدون هیچ پردازشی ارسال می‌شود.",
                     msgEncodingFile: "در حال آماده‌سازی داده فایل...",
@@ -1683,14 +1687,40 @@
                 return outFile;
             }
 
-            async function sliceAudioFileFFmpeg(file, chunkDuration, bitrateValue, overlapSeconds = 0) {
+            // Resolves output extension + MIME for a sliced chunk.
+            // extractAudio=true  → always audio/mp3 (strip video, re-encode with libmp3lame)
+            // extractAudio=false → keep the source container/codec (stream copy) so an uploaded
+            //                      MP4 stays MP4, WAV stays WAV, etc.
+            function resolveChunkOutputFormat(file, extractAudio) {
+                if (extractAudio) {
+                    return { ext: 'mp3', mime: 'audio/mpeg', codecArgs: null /* filled with bitrate below */ };
+                }
+                const srcExt = ((file.name || '').split('.').pop() || '').toLowerCase() || 'bin';
+                const mime = (file.type && file.type !== 'application/octet-stream')
+                    ? file.type
+                    : (/^(mp4|webm|mov|mkv|avi)$/i.test(srcExt) ? `video/${srcExt === 'mov' ? 'quicktime' : srcExt}`
+                        : /^(mp3)$/i.test(srcExt) ? 'audio/mpeg'
+                        : /^(m4a)$/i.test(srcExt) ? 'audio/mp4'
+                        : `audio/${srcExt}`);
+                return { ext: srcExt, mime, codecArgs: ['-c', 'copy'] };
+            }
+
+            async function sliceAudioFileFFmpeg(file, chunkDuration, bitrateValue, overlapSeconds = 0, extractAudio = true) {
                 await loadFFmpeg();
 
                 const duration = await getFileDuration(file);
-                const ext = 'mp3';
-                const inputName = `input_${Date.now()}.${file.name.split('.').pop()}`;
+                const format = resolveChunkOutputFormat(file, extractAudio);
+                const ext = format.ext;
+                const mime = format.mime;
+                // When extracting to MP3, apply bitrate/quality flags; when preserving original
+                // format we stream-copy and ignore the bitrate dropdown (re-encoding would defeat
+                // "keep original format").
+                const codecArgs = extractAudio
+                    ? ['-vn', '-acodec', 'libmp3lame', ...buildAudioBitrateArgs(bitrateValue)]
+                    : format.codecArgs;
+
+                const inputName = `input_${Date.now()}.${(file.name.split('.').pop() || 'bin')}`;
                 ffmpeg.FS('writeFile', inputName, await fetchFile(file));
-                const brArgs = buildAudioBitrateArgs(bitrateValue);
 
                 // Show progress ring for FFmpeg phase
                 const showFfmpegProgress = (done, total) => {
@@ -1709,19 +1739,14 @@
                     }
                 };
 
-                // No chunking (or file shorter than one chunk): single compressed MP3
+                // No chunking needed (or file shorter than one chunk): still run through the chosen
+                // output path so extract-on compresses to MP3 and extract-off keeps the original.
                 if (!duration || !chunkDuration || duration <= chunkDuration) {
                     showFfmpegProgress(0, 1);
                     const outputName = `chunk_0.${ext}`;
-                    await ffmpeg.run(
-                        '-i', inputName,
-                        '-vn',
-                        '-acodec', 'libmp3lame',
-                        ...brArgs,
-                        outputName
-                    );
+                    await ffmpeg.run('-i', inputName, ...codecArgs, outputName);
                     const data = ffmpeg.FS('readFile', outputName);
-                    const chunkFile = new File([new Blob([data.buffer], { type: 'audio/mp3' })], 'part_1.mp3', { type: 'audio/mp3' });
+                    const chunkFile = new File([new Blob([data.buffer], { type: mime })], `part_1.${ext}`, { type: mime });
                     chunkFile.startSeconds = 0;
                     chunkFile.endSeconds = duration || 0;
                     ffmpeg.FS('unlink', outputName);
@@ -1753,19 +1778,19 @@
                         dom.resultLoaderText.textContent = translations[currentLang].msgFFmpegProcessing(i + 1, totalChunks);
                     }
 
+                    // -ss before -i is faster for stream-copy; with re-encode (extract) either order
+                    // works. Keep -ss before -i for both so large files seek quickly.
                     await ffmpeg.run(
                         '-ss', actualStart.toString(),
                         '-i', inputName,
                         '-t', sliceLength.toString(),
-                        '-vn',
-                        '-acodec', 'libmp3lame',
-                        ...brArgs,
+                        ...codecArgs,
                         outputName
                     );
 
                     const data = ffmpeg.FS('readFile', outputName);
-                    const chunkBlob = new Blob([data.buffer], { type: 'audio/mp3' });
-                    const chunkFile = new File([chunkBlob], `part_${i + 1}.mp3`, { type: 'audio/mp3' });
+                    const chunkBlob = new Blob([data.buffer], { type: mime });
+                    const chunkFile = new File([chunkBlob], `part_${i + 1}.${ext}`, { type: mime });
                     chunkFile.startSeconds = actualStart;
                     chunkFile.endSeconds = actualEnd;
                     chunks.push(chunkFile);
@@ -2205,13 +2230,15 @@
             }
 
             // Builds a user-friendly download filename for a chunk:
-            // e.g. "myvideo_chunk1_(0:00-3:01).mp3"
+            // e.g. "myvideo_chunk1_(0:00-3:01).mp4" (extension follows the actual chunk format)
             function buildChunkDownloadName(chunk, index, total, originalFileName) {
                 const base = (originalFileName || 'chunk').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'chunk';
                 const timeRange = (chunk.startSeconds !== undefined && chunk.endSeconds !== undefined)
                     ? `_(${formatTime(chunk.startSeconds)}-${formatTime(chunk.endSeconds)})`
                     : '';
-                return `${base}_chunk${index + 1}${timeRange}.mp3`;
+                const ext = ((chunk && chunk.name) ? chunk.name.split('.').pop() : '') ||
+                    ((originalFileName || '').split('.').pop()) || 'bin';
+                return `${base}_chunk${index + 1}${timeRange}.${ext}`;
             }
 
             function joinIndicesForLabel(indices) {
@@ -2827,7 +2854,7 @@
                         const useFFmpeg = ffmpegMasterOn && canUseFFmpeg && (fileType === 'audio' || fileType === 'video') && (chunkSeconds > 0 || extractEnabled);
 
                         if (useFFmpeg && chunkSeconds > 0) {
-                            const chunks = await sliceAudioFileFFmpeg(selectedFile, chunkSeconds, bitrateValue, overlapSeconds);
+                            const chunks = await sliceAudioFileFFmpeg(selectedFile, chunkSeconds, bitrateValue, overlapSeconds, extractEnabled);
 
                             // Cancel was pressed while FFmpeg was still slicing (slicing itself isn't
                             // abortable mid-run, but we stop here instead of going on to send anything).

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Media2Text AI">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded background -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)"/>
+  <!-- media waveform (left) -->
+  <g fill="#ffffff">
+    <rect x="11" y="28" width="3.5" height="14" rx="1.75"/>
+    <rect x="16.5" y="22" width="3.5" height="24" rx="1.75"/>
+    <rect x="22" y="26" width="3.5" height="18" rx="1.75"/>
+    <rect x="27.5" y="18" width="3.5" height="30" rx="1.75"/>
+    <rect x="33" y="24" width="3.5" height="20" rx="1.75"/>
+  </g>
+  <!-- conversion chevron -->
+  <path d="M38 26 L46 32 L38 38 Z" fill="#ffffff"/>
+  <!-- text lines (right) -->
+  <g fill="#ffffff">
+    <rect x="48" y="22" width="6" height="3" rx="1.5"/>
+    <rect x="48" y="28.5" width="6" height="3" rx="1.5"/>
+    <rect x="48" y="35" width="4" height="3" rx="1.5"/>
+  </g>
+</svg>

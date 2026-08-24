@@ -1,6 +1,12 @@
-# 🎬 Media2Text AI
+<p align="center">
+  <img src="./icon-512.png" alt="Media2Text AI" width="160" height="160">
+</p>
 
-A modern, multilingual, browser-based tool for converting **audio**, **image**, and **video** files into text using AI-powered transcription, OCR, translation, and formatting — all running client-side with optional FFmpeg.wasm chunking for large media files.
+<h1 align="center">Media2Text AI</h1>
+
+<p align="center">
+  A modern, multilingual, browser-based tool for converting <strong>audio</strong>, <strong>image</strong>, and <strong>video</strong> files into text using AI-powered transcription, OCR, translation, and formatting — all running client-side with optional FFmpeg.wasm chunking for large media files.
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg" alt="PRs Welcome">
@@ -19,8 +25,27 @@ A modern, multilingual, browser-based tool for converting **audio**, **image**, 
 ```
 index.html              # Main application (HTML + CSS + JS)
 coi-serviceworker.js    # Required for SharedArrayBuffer / FFmpeg.wasm chunking
-vendor/                 # Local copies of FFmpeg.wasm, Tailwind, fonts, icons (optional layout)
-assets/                 # Preview screenshots
+LICENSE
+README.md
+
+# App icons (keep at project root — browsers request /favicon.ico by default)
+favicon.ico             # Default browser favicon (multi-size)
+favicon.svg             # Crisp vector icon for modern browsers
+favicon-32.png          # 32×32 PNG fallback
+apple-touch-icon.png    # iOS home-screen icon (180×180)
+icon-192.png            # PWA / Android icon
+icon-512.png            # PWA / high-res icon
+
+assets/                 # Preview screenshots for README
+  preview-api-settings.jpg
+  preview-upload-convert.jpg
+  preview-result.jpg
+  preview-translate-format.jpg
+
+vendor/                 # Local copies of FFmpeg.wasm, Tailwind, fonts, Iconify (optional layout)
+  ffmpeg.min.js
+  ffmpeg-core.js
+  ...
 ```
 
 > **Important:** `index.html` and `coi-serviceworker.js` must be served from the **same origin**.  

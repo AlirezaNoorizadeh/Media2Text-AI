@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title data-key="pageTitle">Content-to-Text Converter</title>
+    <title data-key="pageTitle">Media2Text AI</title>
 
     <!--
         Content-Security-Policy (best effort). GitHub Pages doesn't let us set a real HTTP
@@ -299,7 +299,7 @@
     <div id="main-container" class="max-w-4xl mx-auto p-4 md:p-8 w-full">
 
         <header class="text-center mb-10 relative">
-            <h1 class="text-4xl font-bold text-slate-800 dark:text-white mx-12" data-key="mainTitle">Content-to-Text Converter</h1>
+            <h1 class="text-4xl font-bold text-slate-800 dark:text-white mx-12" data-key="mainTitle">Media2Text AI</h1>
             <p class="text-lg mt-2 text-slate-600 dark:text-slate-300" data-key="subTitle">Easily convert your audio, image, and video files to text.</p>
             <button id="reset-app-btn" class="absolute top-0 right-0 inline-flex items-center justify-center text-slate-500 hover:text-red-500 transition-colors p-1 rounded-lg" data-key="resetAppBtnTooltip" title="Reset Application">
                 <iconify-icon icon="mdi:power" width="24" height="24"></iconify-icon>
@@ -804,14 +804,14 @@
 
     <footer class="mt-12 py-6 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400" dir="ltr">
         <div class="flex items-center justify-center gap-3 flex-wrap">
-            <span>© 2026 Content-to-Text Converter</span>
+            <span>© 2026 Media2Text AI</span>
             <span>•</span>
-            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
+            <a href="https://github.com/AlirezaNoorizadeh/Media2Text-AI" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
                 <iconify-icon icon="mdi:github" width="18" height="18"></iconify-icon>
                 GitHub
             </a>
             <span>•</span>
-            <a href="https://github.com/AlirezaNoorizadeh/Content-to-Text-AI-Converter/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
+            <a href="https://github.com/AlirezaNoorizadeh/Media2Text-AI/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-sky-500 font-medium">
                 <iconify-icon icon="mdi:license" width="16" height="16"></iconify-icon>
                 License (MIT)
             </a>
@@ -1032,8 +1032,8 @@
 
             const translations = {
                 en: {
-                    pageTitle: "Content-to-Text Converter",
-                    mainTitle: "Content-to-Text Converter",
+                    pageTitle: "Media2Text AI",
+                    mainTitle: "Media2Text AI",
                     subTitle: "Easily convert your audio, image, and video files to text.",
                     apiSettingsTitle: "1. API Settings",
                     apiProviderLabel: "API Provider",
@@ -1185,8 +1185,8 @@
                     downloadChunkBtn: "Download this chunk",
                 },
                 fa: {
-                    pageTitle: "تبدیل محتوا به متن",
-                    mainTitle: "ابزار تبدیل محتوا به متن",
+                    pageTitle: "Media2Text AI",
+                    mainTitle: "Media2Text AI",
                     subTitle: "فایل‌های صوتی، تصویری و ویدیویی خود را به سادگی به متن تبدیل کنید.",
                     apiSettingsTitle: "۱. تنظیمات API",
                     apiProviderLabel: "سرویس‌دهنده API",
@@ -2186,15 +2186,26 @@
             }
 
             // Triggers a browser download of a single chunk File without navigating away from the page.
-            function downloadChunkFile(file) {
+            // downloadName is optional; when provided it is used as the saved filename instead of file.name.
+            function downloadChunkFile(file, downloadName) {
                 const url = URL.createObjectURL(file);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = file.name;
+                a.download = downloadName || file.name;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+
+            // Builds a user-friendly download filename for a chunk:
+            // e.g. "myvideo_chunk1_(0:00-3:01).mp3"
+            function buildChunkDownloadName(chunk, index, total, originalFileName) {
+                const base = (originalFileName || 'chunk').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'chunk';
+                const timeRange = (chunk.startSeconds !== undefined && chunk.endSeconds !== undefined)
+                    ? `_(${formatTime(chunk.startSeconds)}-${formatTime(chunk.endSeconds)})`
+                    : '';
+                return `${base}_chunk${index + 1}${timeRange}.mp3`;
             }
 
             function joinIndicesForLabel(indices) {
@@ -2294,7 +2305,10 @@
                         downloadBtn.className = 'inline-flex items-center justify-center flex-shrink-0 p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-sky-500 hover:border-sky-400 transition-colors';
                         downloadBtn.title = translations[currentLang].downloadChunkBtn;
                         downloadBtn.innerHTML = '<iconify-icon icon="mdi:download" width="18" height="18"></iconify-icon>';
-                        downloadBtn.addEventListener('click', () => downloadChunkFile(chunk));
+                        downloadBtn.addEventListener('click', () => {
+                            const name = buildChunkDownloadName(chunk, idx, chunks.length, selectedFile ? selectedFile.name : null);
+                            downloadChunkFile(chunk, name);
+                        });
 
                         row.appendChild(item);
                         row.appendChild(downloadBtn);
@@ -2320,6 +2334,7 @@
                     };
                     function cleanup() {
                         dom.chunkSelectionPanel.classList.add('hidden');
+                        dom.chunkSelectionList.innerHTML = '';
                         dom.chunkSelectionSelectAll.removeEventListener('click', onSelectAll);
                         dom.chunkSelectionSelectNone.removeEventListener('click', onSelectNone);
                         dom.chunkSelectionConfirmBtn.removeEventListener('click', onConfirm);
@@ -2789,6 +2804,10 @@
                     let finalResult = '';
                     let processedChunkNumbers = []; // 1-based original chunk numbers actually combined
                     let totalChunksForLabel = 0;
+                    // When cancel leaves no result, stopLoading() (in finally) always un-hides the
+                    // textarea; this flag makes us restore the placeholder afterwards so the flex
+                    // layout doesn't show both placeholder + empty textarea side-by-side.
+                    let restorePlaceholderAfterStop = false;
 
                     try {
                         const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10) || 0;
@@ -2886,6 +2905,7 @@
                         console.error('API / Processing Error:', error);
                         if (error.name === 'AbortError') {
                             dom.chunkSelectionPanel.classList.add('hidden');
+                            dom.chunkSelectionList.innerHTML = '';
                             if (processedChunkNumbers.length > 0) {
                                 // Cancelled partway through sending multiple chunks: show the combined
                                 // result of whatever finished before Cancel was pressed (e.g. "3 of 4"
@@ -2905,21 +2925,18 @@
                             } else {
                                 // Nothing was produced in this run (cancelled during FFmpeg slicing,
                                 // during the chunk-selection panel, or before the first chunk/file
-                                // finished uploading) — leave outputText empty for now; the default
-                                // placeholder gets restored below, AFTER stopLoading() (which always
-                                // force-shows outputText), so it's the state that's actually visible.
+                                // finished uploading). stopLoading() in finally always un-hides the
+                                // textarea; restorePlaceholderAfterStop makes us put the placeholder
+                                // back afterwards so both don't sit side-by-side in the flex container.
                                 dom.outputText.value = '';
+                                restorePlaceholderAfterStop = true;
                             }
                             showToast('msgCancelled', false);
                             currentAbortController = null;
                             currentChunkInfo = null;
-                            stopLoading();
-                            if (processedChunkNumbers.length === 0) {
-                                // Go back to the same default empty state as a fresh page load
-                                // (placeholder text), rather than showing a blank box.
-                                dom.outputPlaceholder.classList.remove('hidden');
-                                dom.outputText.classList.add('hidden');
-                            }
+                            // Do NOT call stopLoading() here — finally always runs and would re-show
+                            // the textarea after we hide it. Let finally handle stopLoading, then
+                            // restore the placeholder if needed.
                             return;
                         }
                         const msg = (error.message || '').toLowerCase();
@@ -2937,6 +2954,10 @@
                         currentAbortController = null;
                         currentChunkInfo = null;
                         stopLoading();
+                        if (restorePlaceholderAfterStop) {
+                            dom.outputPlaceholder.classList.remove('hidden');
+                            dom.outputText.classList.add('hidden');
+                        }
                     }
                 });
 

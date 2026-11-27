@@ -207,7 +207,8 @@
                 transform: translateY(20px);
             }
 
-        #output-text-area, #translate-input-area, #translate-output-area, #expand-text-area {
+        #output-text-area, #translate-input-area, #translate-output-area, #expand-text-area,
+        #summary-input-area, #summary-custom-prompt, #summary-output-area {
             background: transparent;
             border: none;
             width: 100%;
@@ -291,6 +292,44 @@
             border: 1px solid rgba(14, 165, 233, 0.3);
             background-color: rgba(14, 165, 233, 0.1);
             color: #0284c7;
+        }
+
+        .dl-btn {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            padding: 4px 10px;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            color: #475569;
+            transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .dark .dl-btn {
+            border-color: #475569;
+            background-color: #1e293b;
+            color: #cbd5e1;
+        }
+
+        .dl-btn:hover {
+            border-color: #0ea5e9;
+            color: #0284c7;
+        }
+
+        .dark .dl-btn:hover {
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+
+        .dl-btn.disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .dl-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
         }
 
         .dark .model-tag-badge {
@@ -526,6 +565,25 @@
                         </div>
                     </div>
 
+                    <div class="mt-6">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="outputTypeLabel">Timing Level</label>
+                        <div id="output-type-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                <span class="selected-text truncate" data-key="outputPlain">Continuous text (no timestamps)</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="plain" data-key="outputPlain">Continuous text (no timestamps)</div>
+                                <div class="custom-dropdown-item" data-value="timed" data-key="outputTimed">Timed lines (lyrics / subtitles)</div>
+                            </div>
+                            <select id="output-type-select" class="hidden">
+                                <option value="plain" selected data-key="outputPlain">Continuous text (no timestamps)</option>
+                                <option value="timed" data-key="outputTimed">Timed lines (lyrics / subtitles)</option>
+                            </select>
+                        </div>
+                        <p id="output-type-hint" class="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed" data-key="outputHintPlain">One continuous block of text with no timings. Only the TXT export is available, and it is clean text.</p>
+                    </div>
+
                     <button id="convert-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
                         <iconify-icon id="convert-icon" icon="mdi:refresh" class="hidden"></iconify-icon>
                         <span id="convert-btn-text" data-key="convertBtn">Convert to Text</span>
@@ -583,6 +641,18 @@
                                     <button type="button" id="chunk-selection-confirm-btn" class="text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 rounded-xl px-4 py-1.5 transition-colors" data-key="chunkSelectionSendBtn">Send selected chunks</button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    <div id="download-bar" class="hidden mt-3 flex items-center justify-between flex-wrap gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                            <iconify-icon icon="mdi:download" width="16" height="16"></iconify-icon>
+                            <span data-key="downloadLabel">Download</span>
+                        </span>
+                        <div class="flex items-center gap-1.5" dir="ltr">
+                            <button type="button" id="download-txt-btn" class="dl-btn" title="Download as plain text (.txt, timestamps removed)">TXT</button>
+                            <button type="button" id="download-srt-btn" class="dl-btn" title="Download as subtitles (.srt)" disabled>SRT</button>
+                            <button type="button" id="download-lrc-btn" class="dl-btn" title="Download as timed lyrics (.lrc)" disabled>LRC</button>
+                            <button type="button" id="download-vtt-btn" class="dl-btn" title="Download as WebVTT subtitles (.vtt)" disabled>VTT</button>
                         </div>
                     </div>
                     <details id="chunks-output-wrapper" class="hidden mt-4 group">
@@ -714,18 +784,93 @@
                         <div id="tones-output-list" class="space-y-2 mt-2"></div>
                     </details>
                 </section>
+
+                <section id="summary-section" class="glow-card bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 mt-8">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-800 dark:text-white" data-key="summaryTitle">5. Summarization</h2>
+
+                    <div class="mb-4">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="summarySourceLabel">Input Source</label>
+                        <div class="flex rounded-lg border border-slate-300 dark:border-slate-600 overflow-hidden bg-slate-50 dark:bg-slate-700" id="summary-source-toggle-group">
+                            <button type="button" id="summary-source-result" class="flex-1 py-2.5 px-4 text-sm font-medium transition-colors bg-sky-500 text-white" data-value="result" data-key="sourceResultLabel">From Result Box</button>
+                            <button type="button" id="summary-source-manual" class="flex-1 py-2.5 px-4 text-sm font-medium transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600" data-value="manual" data-key="sourceManualLabel">Manual Input</button>
+                        </div>
+                    </div>
+
+                    <div id="summary-input-wrapper" class="hidden mb-4">
+                        <div class="w-full min-h-[150px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 flex items-center">
+                            <textarea id="summary-input-area" class="min-h-[120px]" data-key="summaryInputPlaceholder" placeholder="Paste the text you want to summarize"></textarea>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="summaryTypeLabel">Summary Type</label>
+                        <div id="summary-type-dropdown" class="custom-dropdown bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg">
+                            <div class="custom-dropdown-trigger focus:outline-none focus:ring-2 focus:ring-sky-500" style="height: 44px; padding: 0.5rem 0.75rem;">
+                                <span class="selected-text truncate" data-key="summaryTypeShort">Short summary</span>
+                                <iconify-icon icon="mdi:chevron-down" width="20" height="20" class="text-slate-500"></iconify-icon>
+                            </div>
+                            <div class="custom-dropdown-menu">
+                                <div class="custom-dropdown-item selected" data-value="short" data-key="summaryTypeShort">Short summary</div>
+                                <div class="custom-dropdown-item" data-value="bullets" data-key="summaryTypeBullets">Key points</div>
+                                <div class="custom-dropdown-item" data-value="detailed" data-key="summaryTypeDetailed">Detailed summary</div>
+                                <div class="custom-dropdown-item" data-value="meeting" data-key="summaryTypeMeeting">Meeting minutes</div>
+                                <div class="custom-dropdown-item" data-value="study" data-key="summaryTypeStudy">Study notes</div>
+                                <div class="custom-dropdown-item" data-value="custom" data-key="summaryTypeCustom">Custom prompt</div>
+                            </div>
+                            <select id="summary-type-select" class="hidden">
+                                <option value="short" selected data-key="summaryTypeShort">Short summary</option>
+                                <option value="bullets" data-key="summaryTypeBullets">Key points</option>
+                                <option value="detailed" data-key="summaryTypeDetailed">Detailed summary</option>
+                                <option value="meeting" data-key="summaryTypeMeeting">Meeting minutes</option>
+                                <option value="study" data-key="summaryTypeStudy">Study notes</option>
+                                <option value="custom" data-key="summaryTypeCustom">Custom prompt</option>
+                            </select>
+                        </div>
+                        <p id="summary-type-hint" class="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed" data-key="summaryTypeHintShort">One short paragraph with the main idea, about 3 to 5 sentences.</p>
+                    </div>
+
+                    <div id="summary-custom-wrapper" class="mt-4 hidden">
+                        <label class="block mb-2 text-sm font-medium text-slate-600 dark:text-slate-300" data-key="summaryCustomPromptLabel">Custom prompt</label>
+                        <div class="w-full min-h-[150px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 flex items-center">
+                            <textarea id="summary-custom-prompt" class="min-h-[120px]" data-key="summaryCustomPromptPlaceholder" placeholder="For example: Summarize in 5 bullet points and list every number mentioned."></textarea>
+                        </div>
+                    </div>
+
+                    <button id="summarize-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <iconify-icon id="summarize-icon" icon="mdi:checkbox-marked"></iconify-icon>
+                        <span id="summarize-btn-text" data-key="summarizeBtn">Summarize</span>
+                    </button>
+
+                    <div class="flex justify-between items-center my-4 flex-wrap gap-2">
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white" data-key="summaryOutputTitle">Summary</h3>
+                        <div class="flex items-center gap-1 border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-700 p-1 shadow-sm" dir="ltr">
+                            <button id="summary-clear-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-red-500" data-key="clearBtnTooltip" title="Clear result"><iconify-icon icon="mdi:eraser" width="18" height="18"></iconify-icon></button>
+                            <button id="summary-copy-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-sky-500" data-key="copyBtnTooltip" title="Copy text"><iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon></button>
+                            <span class="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-0.5"></span>
+                            <button id="summary-expand-btn" class="inline-flex items-center justify-center p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400" data-key="expandBtnTooltip" title="Expand view"><iconify-icon icon="mdi:arrow-expand-all" width="18" height="18"></iconify-icon></button>
+                        </div>
+                    </div>
+
+                    <div id="summary-output-container" class="w-full min-h-[200px] bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-slate-600 dark:text-slate-300 whitespace-pre-wrap flex items-center justify-center">
+                        <p id="summary-output-placeholder" class="text-center text-slate-400 dark:text-slate-500" data-key="summaryOutputPlaceholder">the summary will appear here</p>
+                        <div id="summary-loader" class="flex flex-col items-center justify-center gap-3 hidden">
+                            <iconify-icon icon="mdi:loading" class="animate-spin text-sky-500" width="50" height="50" dir="ltr"></iconify-icon>
+                        </div>
+                        <textarea id="summary-output-area" class="min-h-[200px] hidden"></textarea>
+                    </div>
+                </section>
             </div>
         </main>
 
         <div class="fixed bottom-4 left-4 z-20 flex flex-col gap-3" dir="ltr">
-            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-                <button id="lang-en" class="px-3 py-2 text-sm font-semibold transition-colors">EN</button>
-                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold transition-colors">FA</button>
-            </div>
             <button id="theme-toggle-btn" class="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700" aria-label="Toggle theme">
                 <iconify-icon icon="mdi:weather-night" class="text-slate-500 dark:hidden" width="24" height="24"></iconify-icon>
                 <iconify-icon icon="mdi:white-balance-sunny" class="text-slate-500 hidden dark:inline" width="24" height="24"></iconify-icon>
             </button>
+            <div class="flex bg-white dark:bg-slate-800 rounded-full shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                <button id="lang-en" class="px-3 py-2 text-sm font-semibold transition-colors">EN</button>
+                <button id="lang-fa" class="px-3 py-2 text-sm font-semibold transition-colors">FA</button>
+            </div>
         </div>
 
         <!-- Expanded Modal -->
@@ -952,6 +1097,13 @@
                 convertBtnText: document.getElementById('convert-btn-text'),
                 convertIcon: document.getElementById('convert-icon'),
                 outputText: document.getElementById('output-text-area'),
+                outputTypeSelect: document.getElementById('output-type-select'),
+                outputTypeHint: document.getElementById('output-type-hint'),
+                downloadBar: document.getElementById('download-bar'),
+                downloadTxtBtn: document.getElementById('download-txt-btn'),
+                downloadSrtBtn: document.getElementById('download-srt-btn'),
+                downloadLrcBtn: document.getElementById('download-lrc-btn'),
+                downloadVttBtn: document.getElementById('download-vtt-btn'),
                 outputPlaceholder: document.getElementById('output-placeholder'),
                 copyBtn: document.getElementById('copy-btn'),
                 clearBtn: document.getElementById('clear-btn'),
@@ -997,6 +1149,21 @@
                 translateInputArea: document.getElementById('translate-input-area'),
                 translateOutputArea: document.getElementById('translate-output-area'),
                 translateOutputPlaceholder: document.getElementById('translate-output-placeholder'),
+                summaryTypeSelect: document.getElementById('summary-type-select'),
+                summaryTypeHint: document.getElementById('summary-type-hint'),
+                summaryCustomWrapper: document.getElementById('summary-custom-wrapper'),
+                summaryCustomPrompt: document.getElementById('summary-custom-prompt'),
+                summaryInputWrapper: document.getElementById('summary-input-wrapper'),
+                summaryInputArea: document.getElementById('summary-input-area'),
+                summarizeBtn: document.getElementById('summarize-btn'),
+                summarizeBtnText: document.getElementById('summarize-btn-text'),
+                summarizeIcon: document.getElementById('summarize-icon'),
+                summaryOutputArea: document.getElementById('summary-output-area'),
+                summaryOutputPlaceholder: document.getElementById('summary-output-placeholder'),
+                summaryLoader: document.getElementById('summary-loader'),
+                summaryCopyBtn: document.getElementById('summary-copy-btn'),
+                summaryClearBtn: document.getElementById('summary-clear-btn'),
+                summaryExpandBtn: document.getElementById('summary-expand-btn'),
                 translateLoader: document.getElementById('translate-loader'),
                 sourceResultRadio: document.getElementById('source-result'),
                 sourceManualRadio: document.getElementById('source-manual'),
@@ -1030,6 +1197,14 @@
             let currentAbortController = null;
             let activeExpandedTextArea = null;
             let lastResult = localStorage.getItem('lastResult') || '';
+            let lastResultMode = localStorage.getItem('lastResultMode') || 'plain';
+            // Canonical [mm:ss] transcript of the current result, so TXT/SRT/LRC/VTT can all be produced
+            // even while the box shows the plain text. Empty when the result has no timings at all.
+            let lastResultTimed = localStorage.getItem('lastResultTimed') || '';
+            let lastResultBaseName = localStorage.getItem('lastResultBaseName') || '';
+            // Segment timings returned by whisper's verbose_json response (real timings).
+            // Reset on every audio request and consumed once by the transcription flow.
+            let lastApiSegments = null;
             let lastTranslation = JSON.parse(localStorage.getItem('lastTranslation') || '{}');
             let toastTimeout;
             let currentLang = 'en';
@@ -1058,6 +1233,16 @@
                     langAr: "Arabic",
                     langEs: "Spanish",
                     langFr: "French",
+                    outputTypeLabel: "Timing Level",
+                    outputPlain: "Continuous text (no timestamps)",
+                    outputTimed: "Timed lines (lyrics / subtitles)",
+                    outputHintPlain: "One continuous block of text with no timings. Only the TXT export is available, and it is clean text.",
+                    outputHintTimed: "The model returns short lines with a [mm:ss] timestamp each. TXT (clean text), SRT, LRC and VTT are all downloadable.",
+                    downloadLabel: "Download",
+                    msgDownloaded: "File downloaded.",
+                    msgNoOutput: "There is nothing to download yet.",
+                    msgNoTimestamps: "This result has no timings, so SRT/LRC/VTT cannot be built. Convert again with the timed level, or open a history item that already has timings.",
+                    msgNoTimestampsReturned: "The model returned no timestamps, so the text is shown without timings.",
                     convertBtn: "Convert to Text",
                     resultTitle: "3. Result",
                     copyBtnTooltip: "Copy text",
@@ -1084,6 +1269,30 @@
                     sourceManualLabel: "Manual Input",
                     translateInputPlaceholder: "Enter text to process",
                     translateOutputPlaceholder: "result will appear here",
+                    summaryTitle: "5. Summarization",
+                    summarySourceLabel: "Input Source",
+                    summaryInputPlaceholder: "Paste the text you want to summarize",
+                    summaryTypeLabel: "Summary Type",
+                    summaryTypeShort: "Short summary",
+                    summaryTypeBullets: "Key points",
+                    summaryTypeDetailed: "Detailed summary",
+                    summaryTypeMeeting: "Meeting minutes",
+                    summaryTypeStudy: "Study notes",
+                    summaryTypeCustom: "Custom prompt",
+                    summaryTypeHintShort: "One short paragraph with the main idea, about 3 to 5 sentences.",
+                    summaryTypeHintBullets: "The most important points as a short bullet list, easy to skim.",
+                    summaryTypeHintDetailed: "A structured summary with headings, covering the whole content.",
+                    summaryTypeHintMeeting: "Topics discussed, decisions made, and action items with their owners.",
+                    summaryTypeHintStudy: "Study notes: main concepts, definitions, and questions to review.",
+                    summaryTypeHintCustom: "Your own instruction is sent to the model exactly as written.",
+                    summaryCustomPromptLabel: "Custom prompt",
+                    summaryCustomPromptPlaceholder: "For example: Summarize in 5 bullet points and list every number mentioned.",
+                    summarizeBtn: "Summarize",
+                    msgSummarizing: "Summarizing...",
+                    summaryOutputTitle: "Summary",
+                    summaryOutputPlaceholder: "the summary will appear here",
+                    msgNoTextToSummarize: "There is no text to summarize.",
+                    msgNoCustomPrompt: "Please write the custom prompt first.",
                     historyModalTitle: "Transcription History",
                     translateHistoryModalTitle: "Translation History",
                     historyFileNameLabel: "Source File:",
@@ -1213,6 +1422,16 @@
                     langAr: "عربی",
                     langEs: "اسپانیایی",
                     langFr: "فرانسوی",
+                    outputTypeLabel: "سطح زمان‌بندی",
+                    outputPlain: "متن پیوسته (بدون تایم)",
+                    outputTimed: "خط‌به‌خط با تایم (لیریک / زیرنویس)",
+                    outputHintPlain: "یک متن پیوسته و بدون تایم‌استمپ. فقط خروجی TXT فعال است که همان متن خالص است.",
+                    outputHintTimed: "مدل متن را خط‌به‌خط با تایم‌استمپ [mm:ss] برمی‌گرداند؛ خروجی TXT (متن خالص)، SRT، LRC و VTT همه قابل دانلودند.",
+                    downloadLabel: "دانلود",
+                    msgDownloaded: "فایل دانلود شد.",
+                    msgNoOutput: "هنوز چیزی برای دانلود وجود ندارد.",
+                    msgNoTimestamps: "این نتیجه تایم‌استمپ ندارد، پس SRT/LRC/VTT ساخته نمی‌شود. با سطح «زمان‌دار» دوباره تبدیل بزنید یا آیتمی از تاریخچه را باز کنید که تایم دارد.",
+                    msgNoTimestampsReturned: "مدل تایم‌استمپ برنگرداند، بنابراین متن بدون زمان نمایش داده می‌شود.",
                     convertBtn: "تبدیل به متن",
                     resultTitle: "۳. نتیجه",
                     copyBtnTooltip: "کپی کردن متن",
@@ -1239,6 +1458,30 @@
                     sourceManualLabel: "ورودی دستی",
                     translateInputPlaceholder: "متن برای پردازش را اینجا وارد کنید",
                     translateOutputPlaceholder: "نتیجه در اینجا نمایش داده می‌شود",
+                    summaryTitle: "۵. خلاصه‌سازی",
+                    summarySourceLabel: "منبع ورودی",
+                    summaryInputPlaceholder: "متنی که می‌خواهید خلاصه شود را اینجا بچسبانید",
+                    summaryTypeLabel: "نوع خلاصه",
+                    summaryTypeShort: "خلاصه کوتاه",
+                    summaryTypeBullets: "نکات کلیدی",
+                    summaryTypeDetailed: "خلاصه جامع",
+                    summaryTypeMeeting: "صورت‌جلسه",
+                    summaryTypeStudy: "یادداشت مطالعه",
+                    summaryTypeCustom: "پرامپت دلخواه",
+                    summaryTypeHintShort: "یک پاراگراف کوتاه با ایدهٔ اصلی، حدوداً ۳ تا ۵ جمله.",
+                    summaryTypeHintBullets: "مهم‌ترین نکته‌ها به شکل فهرست بولت، مناسب مرور سریع.",
+                    summaryTypeHintDetailed: "خلاصهٔ ساختاریافته با تیتر و بخش‌بندی، با پوشش کل محتوا.",
+                    summaryTypeHintMeeting: "موضوعات مطرح‌شده، تصمیم‌ها و کارهای بعدی همراه با مسئول هر کار.",
+                    summaryTypeHintStudy: "یادداشت مطالعه: مفاهیم اصلی، تعریف‌ها و سؤال‌های مرور.",
+                    summaryTypeHintCustom: "دستور خودتان دقیقاً همان‌طور که می‌نویسید به مدل فرستاده می‌شود.",
+                    summaryCustomPromptLabel: "پرامپت دلخواه",
+                    summaryCustomPromptPlaceholder: "مثلاً: در ۵ بولت خلاصه کن و همهٔ عددهایی که گفته شده را فهرست کن.",
+                    summarizeBtn: "خلاصه کن",
+                    msgSummarizing: "در حال خلاصه‌سازی...",
+                    summaryOutputTitle: "خلاصه",
+                    summaryOutputPlaceholder: "خلاصه در اینجا نمایش داده می‌شود",
+                    msgNoTextToSummarize: "متنی برای خلاصه‌سازی وجود ندارد.",
+                    msgNoCustomPrompt: "لطفاً ابتدا پرامپت دلخواه را بنویسید.",
                     historyModalTitle: "تاریخچه تبدیل‌ها",
                     translateHistoryModalTitle: "تاریخچه ترجمه‌ها",
                     historyFileNameLabel: "فایل منبع:",
@@ -1370,6 +1613,8 @@
                 dom.langFaBtn.classList.toggle('bg-sky-500', lang === 'fa');
                 dom.langFaBtn.classList.toggle('text-white', lang === 'fa');
                 if (typeof updateFfmpegPlanSummary === 'function') updateFfmpegPlanSummary();
+                if (typeof updateOutputTypeHint === 'function') updateOutputTypeHint();
+                if (typeof updateSummaryTypeHint === 'function') updateSummaryTypeHint();
             }
 
             function applyTheme(theme) {
@@ -1843,11 +2088,288 @@
                 });
             }
 
-            function getPrompt(task = 'transcribe') {
+            // ── Output types & file export ──────────────────────────────────────────────────────────────
+            // The model is asked for one canonical shape — one line per segment, each prefixed with
+            // [mm:ss] — and the four output types below are rendered from that same parsed data. That
+            // keeps SRT/LRC/VTT/TXT export consistent, and lets a chunked run add each chunk's real
+            // start offset once, before any formatting happens.
+            // Two timing levels only: whether the model is asked for timestamps. The four download
+            // formats are derived from that one transcript, not a separate mode.
+            const OUTPUT_MODES = ['plain', 'timed'];
+
+            function getOutputMode() {
+                if (!dom.outputTypeSelect) return 'plain';
+                const value = dom.outputTypeSelect.value;
+                return OUTPUT_MODES.includes(value) ? value : 'plain';
+            }
+
+            function isTimedOutputMode() {
+                return getOutputMode() !== 'plain';
+            }
+
+            function updateOutputTypeHint() {
+                if (!dom.outputTypeHint) return;
+                const mode = getOutputMode();
+                const key = 'outputHint' + mode.charAt(0).toUpperCase() + mode.slice(1);
+                dom.outputTypeHint.setAttribute('data-key', key);
+                dom.outputTypeHint.textContent = translations[currentLang][key] || '';
+            }
+
+            function updateSummaryTypeHint() {
+                if (!dom.summaryTypeSelect) return;
+                const type = dom.summaryTypeSelect.value;
+                const key = 'summaryTypeHint' + type.charAt(0).toUpperCase() + type.slice(1);
+                if (dom.summaryTypeHint) {
+                    dom.summaryTypeHint.setAttribute('data-key', key);
+                    dom.summaryTypeHint.textContent = translations[currentLang][key] || '';
+                }
+                // The custom prompt box only makes sense for the custom type.
+                dom.summaryCustomWrapper?.classList.toggle('hidden', type !== 'custom');
+            }
+
+            function padNumber(value, size) {
+                return String(value).padStart(size, '0');
+            }
+
+            // "01:23" / "1:02:03" / "00:01:02,500" / "00:01:02.500" → seconds (float), or null.
+            function parseTimestamp(value) {
+                const match = String(value || '').match(/(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:[.,](\d{1,3}))?/);
+                if (!match) return null;
+                const hours = match[1] !== undefined ? parseInt(match[1], 10) : 0;
+                const minutes = parseInt(match[2], 10);
+                const seconds = parseInt(match[3], 10);
+                const millis = match[4] ? parseInt(match[4].padEnd(3, '0'), 10) : 0;
+                return hours * 3600 + minutes * 60 + seconds + millis / 1000;
+            }
+
+            // Fills in missing/incorrect end times so every segment can become a valid SRT/VTT cue.
+            function normalizeSegments(segments) {
+                const cleaned = segments
+                    .map(seg => ({ start: Math.max(0, seg.start || 0), end: seg.end, text: String(seg.text || '').replace(/\s*\n\s*/g, ' ').trim() }))
+                    .filter(seg => seg.text)
+                    .sort((a, b) => a.start - b.start);
+
+                cleaned.forEach((seg, index) => {
+                    const next = cleaned[index + 1];
+                    const fallbackEnd = Math.min(next ? next.start : seg.start + 8, seg.start + 6);
+                    if (seg.end === null || seg.end === undefined || seg.end <= seg.start) {
+                        seg.end = Math.max(seg.start + 1, fallbackEnd);
+                    }
+                    // Cues must not overlap the next one.
+                    if (next && next.start > seg.start && seg.end > next.start) seg.end = next.start;
+                    if (seg.end <= seg.start) seg.end = seg.start + 1;
+                });
+                return cleaned;
+            }
+
+            // True only when a text really carries timings (a cue arrow or a [mm:ss] line prefix). Used to
+            // decide whether SRT/LRC/VTT make sense, so untimed prose is never "converted" into one big cue.
+            function textHasTimestamps(text) {
+                const raw = String(text || '');
+                if (raw.includes('-->')) return true;
+                return /(?:^|\n)\s*\[?\d{1,2}:\d{1,2}(?::\d{1,2})?(?:[.,]\d{1,3})?\]?\s+\S/.test(raw);
+            }
+
+            // Accepts either the [mm:ss]-per-line shape the model returns or a full SRT/WebVTT block.
+            function parseTimedText(text) {
+                const raw = String(text || '').replace(/\r\n?/g, '\n').trim();
+                if (!raw) return [];
+
+                if (raw.includes('-->')) {
+                    const segments = [];
+                    raw.split(/\n{2,}/).forEach(block => {
+                        const lines = block.split('\n').filter(line => line.trim() !== '');
+                        const cueIndex = lines.findIndex(line => line.includes('-->'));
+                        if (cueIndex === -1) return;
+                        const parts = lines[cueIndex].split('-->');
+                        const start = parseTimestamp(parts[0]);
+                        // WebVTT allows cue settings after the end time; only the first token is the time.
+                        const end = parseTimestamp((parts[1] || '').trim().split(/\s+/)[0]);
+                        const cueText = lines.slice(cueIndex + 1).join('\n').replace(/<[^>]*>/g, '').trim();
+                        if (start === null || !cueText) return;
+                        segments.push({ start, end: (end !== null && end > start) ? end : null, text: cueText });
+                    });
+                    return normalizeSegments(segments);
+                }
+
+                const segments = [];
+                raw.split('\n').forEach(line => {
+                    const match = line.match(/^\s*\[?(\d{1,2}:\d{1,2}(?::\d{1,2})?(?:[.,]\d{1,3})?)\]?\s*(.*)$/);
+                    if (match) {
+                        const start = parseTimestamp(match[1]);
+                        const cueText = match[2].trim();
+                        if (start !== null && cueText) {
+                            segments.push({ start, end: null, text: cueText });
+                            return;
+                        }
+                    }
+                    const textOnly = line.trim();
+                    if (!textOnly) return;
+                    if (segments.length) {
+                        segments[segments.length - 1].text += ' ' + textOnly;
+                        return;
+                    }
+                    // Leading prose without a timestamp: keep it (at 0) instead of silently dropping it.
+                    segments.push({ start: 0, end: null, text: textOnly });
+                });
+                return normalizeSegments(segments);
+            }
+
+            function timeParts(totalSeconds) {
+                const totalMillis = Math.max(0, Math.round((totalSeconds || 0) * 1000));
+                const millis = totalMillis % 1000;
+                const seconds = (totalMillis - millis) / 1000;
+                return { hours: Math.floor(seconds / 3600), minutes: Math.floor((seconds % 3600) / 60), seconds: seconds % 60, millis };
+            }
+
+            function formatSrtTime(totalSeconds) {
+                const p = timeParts(totalSeconds);
+                return `${padNumber(p.hours, 2)}:${padNumber(p.minutes, 2)}:${padNumber(p.seconds, 2)},${padNumber(p.millis, 3)}`;
+            }
+
+            function formatVttTime(totalSeconds) {
+                const p = timeParts(totalSeconds);
+                return `${padNumber(p.hours, 2)}:${padNumber(p.minutes, 2)}:${padNumber(p.seconds, 2)}.${padNumber(p.millis, 3)}`;
+            }
+
+            function formatLrcTime(totalSeconds) {
+                const p = timeParts(totalSeconds);
+                return `${padNumber(p.hours * 60 + p.minutes, 2)}:${padNumber(p.seconds, 2)}.${padNumber(Math.floor(p.millis / 10), 2)}`;
+            }
+
+            function formatShortTime(totalSeconds) {
+                const p = timeParts(totalSeconds);
+                return p.hours > 0
+                    ? `${p.hours}:${padNumber(p.minutes, 2)}:${padNumber(p.seconds, 2)}`
+                    : `${padNumber(p.minutes, 2)}:${padNumber(p.seconds, 2)}`;
+            }
+
+            function segmentsToSrt(segments) {
+                return segments
+                    .map((seg, index) => `${index + 1}\n${formatSrtTime(seg.start)} --> ${formatSrtTime(seg.end)}\n${seg.text}`)
+                    .join('\n\n');
+            }
+
+            function segmentsToVtt(segments) {
+                const cues = segments.map((seg, index) => `${index + 1}\n${formatVttTime(seg.start)} --> ${formatVttTime(seg.end)}\n${seg.text}`);
+                return 'WEBVTT\n\n' + cues.join('\n\n');
+            }
+
+            function segmentsToLrc(segments) {
+                return segments.map(seg => `[${formatLrcTime(seg.start)}]${seg.text}`).join('\n');
+            }
+
+            function segmentsToTimed(segments) {
+                return segments.map(seg => `[${formatShortTime(seg.start)}] ${seg.text}`).join('\n');
+            }
+
+            function segmentsToPlain(segments) {
+                return segments.map(seg => seg.text).join('\n');
+            }
+
+            function stripTimestamps(text) {
+                const segments = textHasTimestamps(text) ? parseTimedText(text) : [];
+                return segments.length ? segmentsToPlain(segments) : String(text || '').trim();
+            }
+
+            function renderByMode(segments, mode) {
+                if (!segments || !segments.length) return '';
+                if (mode === 'srt') return segmentsToSrt(segments);
+                if (mode === 'vtt') return segmentsToVtt(segments);
+                if (mode === 'timed') return segmentsToTimed(segments);
+                return segmentsToPlain(segments);
+            }
+
+            // Renders a canonical [mm:ss] transcript in the level picked right now; falls back to the
+            // stored text when the item carries no timings at all.
+            function renderTimedForMode(timedText, fallbackText) {
+                const segments = timedText ? parseTimedText(timedText) : [];
+                if (!segments.length) return String(fallbackText || '').trim();
+                return renderByMode(segments, getOutputMode());
+            }
+
+            // Timings used by the downloads: the visible text wins (the user may have edited it), and
+            // when it is plain text we fall back to the canonical transcript saved with the result.
+            function getSegmentsForExport() {
+                const text = dom.outputText.value.trim();
+                if (textHasTimestamps(text)) return parseTimedText(text);
+                if (lastResultTimed) return parseTimedText(lastResultTimed);
+                return [];
+            }
+
+            // Translation works on the words, so any timestamps/subtitle scaffolding is stripped first.
+            function getSourceTextForTranslation() {
+                const raw = dom.outputText.value.trim();
+                if (!textHasTimestamps(raw)) return raw;
+                const segments = parseTimedText(raw);
+                return segments.length ? segmentsToPlain(segments) : raw;
+            }
+
+            function getDownloadBaseName() {
+                const candidate = lastResultBaseName || (selectedFile && selectedFile.name) || 'transcript';
+                const base = candidate.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').trim();
+                return base || 'transcript';
+            }
+
+            function downloadTextFile(fileName, content, mimeType) {
+                const blob = new Blob([content], { type: `${mimeType || 'text/plain'};charset=utf-8` });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+
+            function updateDownloadBar() {
+                if (!dom.downloadBar) return;
+                const text = dom.outputText.value.trim();
+                const visible = !!text && !dom.outputText.classList.contains('hidden');
+                dom.downloadBar.classList.toggle('hidden', !visible);
+                if (!visible) return;
+                // TXT is always clean text; the three timed formats need timings to exist.
+                const hasTimings = getSegmentsForExport().length > 0;
+                [dom.downloadSrtBtn, dom.downloadLrcBtn, dom.downloadVttBtn].forEach(btn => {
+                    if (!btn) return;
+                    btn.classList.toggle('disabled', !hasTimings);
+                    btn.disabled = !hasTimings;
+                });
+            }
+
+            function handleResultDownload(format) {
+                const text = dom.outputText.value.trim();
+                if (!text) {
+                    showToast('msgNoOutput', false);
+                    return;
+                }
+                const baseName = getDownloadBaseName();
+                // TXT is always the clean text: subtitle scaffolding is stripped off even when the
+                // box shows a timed format or VTT/SRT is what the user is looking at.
+                const segments = getSegmentsForExport();
+
+                if (format === 'txt') {
+                    downloadTextFile(`${baseName}.txt`, segments.length ? segmentsToPlain(segments) : text, 'text/plain');
+                    showToast('msgDownloaded');
+                    return;
+                }
+                if (!segments.length) {
+                    showToast('msgNoTimestamps', false);
+                    return;
+                }
+                if (format === 'srt') downloadTextFile(`${baseName}.srt`, segmentsToSrt(segments), 'application/x-subrip');
+                else if (format === 'lrc') downloadTextFile(`${baseName}.lrc`, segmentsToLrc(segments), 'text/plain');
+                else if (format === 'vtt') downloadTextFile(`${baseName}.vtt`, segmentsToVtt(segments), 'text/vtt');
+                showToast('msgDownloaded');
+            }
+
+            function buildBasePrompt(task = 'transcribe') {
                 if (task === 'transcribe') {
                     const language = document.getElementById('language-select').value;
                     if (language === 'auto') {
-                        return currentLang === 'fa' ? "فایل زیر را به متن تبدیل کن. زبان را به صورت خودکار تشخیص بده و متن را به همان زبان اصلی بنویس." : "Transcribe the file below. Auto-detect the language and write the text in its original language.";
+                        const basePrompt = currentLang === 'fa' ? "فایل زیر را به متن تبدیل کن. زبان را به صورت خودکار تشخیص بده و متن را به همان زبان اصلی بنویس." : "Transcribe the file below. Auto-detect the language and write the text in its original language.";
+                        return basePrompt;
                     } else {
                         const languageName = document.querySelector(`#language-select option[value=${language}]`).textContent;
                         return currentLang === 'fa' ? `محتوای فایل زیر را آوانویسی کن. فرض کن زبان محتوا ${languageName} است. ترجمه نکن، فقط هرچه میشنوی یا میبینی را به زبان ${languageName} بنویس.` : `Transcribe the content of the file below. Assume the language is ${languageName}. Do not translate; only write what you hear or see in the ${languageName} language.`;
@@ -1868,6 +2390,51 @@
                         return (currentLang === 'fa' ? `متن زیر را فقط مرتب، ویرایش و پاراگراف‌بندی کن. زبان متن را تغییر نده.${toneHint}` : `Format, clean up, and structure the following text into proper paragraphs. Do not change the language.${toneHint}`);
                     }
                 }
+            }
+
+            const TIMING_RULE_EN = " Write the output line by line, starting every line with a [mm:ss] timestamp (minutes:seconds), e.g. [01:23]. Each line must be one short sentence or phrase, kept in exact chronological order, because each line's end time comes from the next line's start. Do not add titles, numbering, bullets, notes or markdown.";
+            const TIMING_RULE_FA = " خروجی را خط‌به‌خط بنویس و ابتدای هر خط تایم‌استمپ [mm:ss] (دقیقه:ثانیه) بگذار، مثلاً [01:23]. هر خط فقط یک جمله یا عبارت کوتاه باشد و ترتیب زمانی دقیقاً حفظ شود، چون پایان هر خط از شروع خط بعدی محاسبه می‌شود. هیچ عنوان، شماره، بولت، توضیح یا مارک‌داون اضافه نکن.";
+
+            // Adds the timestamp contract only for the timed output types; plain text keeps the old prompt.
+            function getPrompt(task = 'transcribe') {
+                const prompt = buildBasePrompt(task, arguments[1]);
+                if (task !== 'transcribe' || !isTimedOutputMode()) return prompt;
+                return prompt + (currentLang === 'fa' ? TIMING_RULE_FA : TIMING_RULE_EN);
+            }
+
+            // Section 5 sends only an instruction; the text itself travels as the text input, the same
+            // way translation does, so a long transcript is never repeated inside the prompt.
+            const SUMMARY_PROMPTS = {
+                short: {
+                    en: 'Summarize the text below in one short paragraph of 3 to 5 sentences. Keep only the main idea and the most important facts.',
+                    fa: 'متن زیر را در یک پاراگراف کوتاه ۳ تا ۵ جمله‌ای خلاصه کن و فقط ایدهٔ اصلی و مهم‌ترین نکته‌ها را نگه دار.'
+                },
+                bullets: {
+                    en: 'Summarize the text below as a short bullet list of the most important points. Start each line with a dash and keep every point to one sentence.',
+                    fa: 'متن زیر را به شکل فهرست کوتاهی از مهم‌ترین نکته‌ها خلاصه کن. هر خط را با خط تیره شروع کن و هر نکته را در یک جمله بنویس.'
+                },
+                detailed: {
+                    en: 'Summarize the text below in a structured way: a one-line overview first, then short sections with headings for the main topics, including any important numbers or names.',
+                    fa: 'متن زیر را ساختاریافته خلاصه کن: اول یک مرور یک‌خطی، بعد بخش‌های کوتاه با تیتر برای موضوعات اصلی، همراه با عددها و نام‌های مهم.'
+                },
+                meeting: {
+                    en: 'Turn the text below into meeting minutes: a one-line goal, the topics discussed, the decisions made, and action items with an owner each (and a deadline if one was mentioned).',
+                    fa: 'متن زیر را به صورت‌جلسه تبدیل کن: هدف جلسه در یک خط، موضوعات مطرح‌شده، تصمیم‌ها، و کارهای بعدی همراه با مسئول هر کار (و در صورت ذکر، موعد آن).'
+                },
+                study: {
+                    en: 'Turn the text below into study notes: the main concepts with a one-line definition each, then a few review questions with short answers.',
+                    fa: 'متن زیر را به یادداشت مطالعه تبدیل کن: مفاهیم اصلی با یک تعریف یک‌خطی برای هرکدام، و بعد چند سؤال مرور همراه با پاسخ کوتاه.'
+                }
+            };
+
+            function buildSummaryPrompt(type, customPrompt) {
+                if (type === 'custom') return String(customPrompt || '').trim();
+                const entry = SUMMARY_PROMPTS[type] || SUMMARY_PROMPTS.short;
+                const instruction = entry[currentLang] || entry.en;
+                const languageNote = currentLang === 'fa'
+                    ? 'خلاصه را به همان زبان متن ورودی بنویس و از توضیح اضافه و حاشیه‌روی پرهیز کن.'
+                    : 'Write the summary in the same language as the input text, without extra commentary.';
+                return `${instruction}\n${languageNote}`;
             }
 
             function updateProcessButtonIcon() {
@@ -2460,6 +3027,10 @@
                         const formData = new FormData();
                         formData.append('file', file);
                         formData.append('model', 'whisper-1');
+                        // Timed output types need real segment timings; whisper only returns them in its
+                        // verbose_json response (plain text/json carry no timestamps at all).
+                        lastApiSegments = null;
+                        if (isTimedOutputMode()) formData.append('response_format', 'verbose_json');
                         const language = document.getElementById('language-select').value;
                         if (language !== 'auto') formData.append('language', language);
 
@@ -2471,7 +3042,12 @@
                         });
 
                         if (data.error) throw new Error(data.error.message);
-                        return data.text;
+                        if (Array.isArray(data.segments)) {
+                            lastApiSegments = data.segments
+                                .map(seg => ({ start: Number(seg.start) || 0, end: Number(seg.end) || 0, text: String(seg.text || '').trim() }))
+                                .filter(seg => seg.text);
+                        }
+                        return data.text || (data.segments || []).map(seg => seg.text).join(' ').trim();
                     } else {
                         const model = apiModel.includes('vision') || apiModel.includes('4o') ? apiModel : 'gpt-4o';
                         const url = 'https://api.openai.com/v1/chat/completions';
@@ -2649,6 +3225,21 @@
                 if (savedTranslationHistory) translationHistory = JSON.parse(savedTranslationHistory);
             }
 
+            // Puts a history item into the result box, rendered in the level currently picked. Items
+            // saved before canonical timings existed fall back to deriving them from their own text.
+            function restoreHistoryItem(item) {
+                lastResultTimed = item.timedText || (textHasTimestamps(item.text) ? segmentsToTimed(parseTimedText(item.text)) : '');
+                lastResult = renderTimedForMode(lastResultTimed, item.text);
+                lastResultMode = getOutputMode();
+                if (item.fileName) lastResultBaseName = item.fileName;
+                dom.outputText.value = lastResult;
+                dom.outputPlaceholder.classList.add('hidden');
+                dom.outputText.classList.remove('hidden');
+                dom.historyModal.classList.add('hidden');
+                updateDownloadBar();
+                showToast('msgHistoryRestored', false);
+            }
+
             function renderHistory() {
                 dom.historyList.innerHTML = '';
                 if (transcriptionHistory.length === 0) {
@@ -2672,6 +3263,13 @@
                     fileNameP.prepend(fileNameLabelSpan);
                     const controlsDiv = document.createElement('div');
                     controlsDiv.className = 'flex items-center gap-2 flex-shrink-0';
+                    // Loading an item renders it in the level picked in the dropdown, using the timings
+                    // saved with it, so an item created as SRT can still be shown as plain text.
+                    const applyBtn = document.createElement('button');
+                    applyBtn.innerHTML = `<iconify-icon icon="mdi:restore" width="18" height="18"></iconify-icon>`;
+                    applyBtn.className = 'text-slate-500 hover:text-sky-500';
+                    applyBtn.title = translations[currentLang].restoreBtnTooltip;
+                    applyBtn.onclick = () => restoreHistoryItem(item);
                     const copyBtn = document.createElement('button');
                     copyBtn.innerHTML = `<iconify-icon icon="mdi:content-copy" width="18" height="18"></iconify-icon>`;
                     copyBtn.className = 'text-slate-500 hover:text-sky-500';
@@ -2685,6 +3283,7 @@
                         renderHistory();
                         showToast('msgHistoryCleared', false);
                     };
+                    controlsDiv.appendChild(applyBtn);
                     controlsDiv.appendChild(copyBtn);
                     controlsDiv.appendChild(deleteBtn);
                     headerDiv.appendChild(fileNameP);
@@ -2767,6 +3366,22 @@
                     if (value) localStorage.setItem('apiModel', value);
                 });
                 initCustomDropdown('language-select-dropdown');
+                initCustomDropdown('output-type-dropdown', (value) => {
+                    try { localStorage.setItem('outputMode', value); } catch (e) { }
+                    updateOutputTypeHint();
+                    // Re-render an existing result in the newly picked level when its timings are known.
+                    if (lastResultTimed && dom.outputText.value.trim() && !dom.outputText.classList.contains('hidden')) {
+                        lastResult = renderTimedForMode(lastResultTimed, lastResult);
+                        dom.outputText.value = lastResult;
+                    }
+                    updateDownloadBar();
+                });
+                // Older builds stored 'srt'/'vtt' here; both are the timed transcript now.
+                const storedOutputMode = localStorage.getItem('outputMode');
+                const savedOutputMode = ['timed', 'srt', 'vtt'].includes(storedOutputMode) ? 'timed' : 'plain';
+                setCustomDropdownValue('output-type-dropdown', savedOutputMode);
+                if (dom.outputTypeSelect) dom.outputTypeSelect.value = savedOutputMode;
+                updateOutputTypeHint();
                 initCustomDropdown('chunk-duration-dropdown', () => { applyOverlapAvailability(); updateFfmpegPlanSummary(); });
                 initCustomDropdown('chunk-overlap-dropdown', () => updateFfmpegPlanSummary());
                 initCustomDropdown('chunk-bitrate-dropdown', () => updateFfmpegPlanSummary());
@@ -2837,10 +3452,33 @@
                     let finalResult = '';
                     let processedChunkNumbers = []; // 1-based original chunk numbers actually combined
                     let totalChunksForLabel = 0;
+                    const outputMode = getOutputMode();
+                    const timedOutput = isTimedOutputMode();
+                    const collectedSegments = [];
+                    // Turns one API reply into globally-timed segments: whisper's verbose_json segments
+                    // when available (real timings), otherwise the model's [mm:ss] lines — shifted by the
+                    // chunk's real start offset so the combined output has correct, file-wide times.
+                    const collectSegments = (rawText, offsetSeconds) => {
+                        if (!timedOutput) return;
+                        const apiSegments = lastApiSegments;
+                        lastApiSegments = null;
+                        const segments = (apiSegments && apiSegments.length) ? apiSegments : (textHasTimestamps(rawText) ? parseTimedText(rawText) : []);
+                        const offset = Number(offsetSeconds) || 0;
+                        segments.forEach(seg => {
+                            collectedSegments.push({
+                                start: seg.start + offset,
+                                end: (seg.end !== null && seg.end !== undefined ? seg.end : seg.start) + offset,
+                                text: seg.text
+                            });
+                        });
+                    };
                     // When cancel leaves no result, stopLoading() (in finally) always un-hides the
                     // textarea; this flag makes us restore the placeholder afterwards so the flex
                     // layout doesn't show both placeholder + empty textarea side-by-side.
                     let restorePlaceholderAfterStop = false;
+                    // An error message also lands in the output textarea, so the download bar has to
+                    // stay hidden for that run instead of showing up over the error text.
+                    let hideDownloadBar = false;
 
                     try {
                         const chunkSeconds = parseInt(dom.chunkDurationSelect.value, 10) || 0;
@@ -2894,6 +3532,7 @@
                                     const chunkResult = await callGenericAPI(getPrompt('transcribe'), chunks[idx]);
                                     addChunkResultBox(idx + 1, chunks.length, chunkResult);
                                     finalResult += (finalResult ? '\n\n' : '') + chunkResult;
+                                    collectSegments(chunkResult, chunks[idx].startSeconds || 0);
                                     processedChunkNumbers.push(idx + 1);
                                 }
                                 currentChunkInfo = null;
@@ -2907,6 +3546,7 @@
                                 dom.infiniteSpinner.classList.add('hidden');
                                 dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
                                 finalResult = await callGenericAPI(getPrompt('transcribe'), chunks[0]);
+                                collectSegments(finalResult, chunks[0].startSeconds || 0);
                                 dom.outputText.value = finalResult;
                             }
                         } else if (useFFmpeg && extractEnabled) {
@@ -2916,14 +3556,39 @@
                             dom.infiniteSpinner.classList.add('hidden');
                             dom.progressCirclePath.setAttribute('stroke-dasharray', '0, 100');
                             finalResult = await callGenericAPI(getPrompt('transcribe'), compressed);
+                            collectSegments(finalResult, 0);
                             dom.outputText.value = finalResult;
                         } else {
                             // No FFmpeg: send original file as-is
                             finalResult = await callGenericAPI(getPrompt('transcribe'), selectedFile);
+                            collectSegments(finalResult, 0);
                             dom.outputText.value = finalResult;
                         }
 
                         lastResult = finalResult;
+                        // Canonical transcript for this run: exports and history restores are derived
+                        // from it, so the level only decides what is displayed here.
+                        lastResultTimed = collectedSegments.length
+                            ? segmentsToTimed(collectedSegments)
+                            : (textHasTimestamps(finalResult) ? segmentsToTimed(parseTimedText(finalResult)) : '');
+                        // Timed level: rebuild the combined text from the globally-offset segments
+                        // (chunk results themselves carry chunk-local times).
+                        if (timedOutput) {
+                            finalResult = collectedSegments.length ? renderByMode(collectedSegments, outputMode) : stripTimestamps(finalResult);
+                            if (!collectedSegments.length) showToast('msgNoTimestampsReturned', false);
+                        }
+                        dom.outputText.value = finalResult;
+                        lastResult = finalResult;
+                        lastResultMode = outputMode;
+                        if (selectedFile) lastResultBaseName = selectedFile.name;
+                        try {
+                            localStorage.setItem('lastResultMode', outputMode);
+                            localStorage.setItem('lastResultTimed', lastResultTimed);
+                            if (lastResultBaseName) localStorage.setItem('lastResultBaseName', lastResultBaseName);
+                        } catch (storageErr) {
+                            console.error('Failed to persist output mode:', storageErr);
+                        }
+                        updateDownloadBar();
                         // Isolated so a full/unavailable localStorage can't wipe out the already-displayed
                         // successful result by falling through to the outer catch block below.
                         try {
@@ -2931,7 +3596,7 @@
                         } catch (storageErr) {
                             console.error('Failed to persist lastResult to localStorage:', storageErr);
                         }
-                        transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult });
+                        transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult, mode: outputMode, timedText: lastResultTimed });
                         saveHistory('transcription');
 
                     } catch (error) {
@@ -2944,16 +3609,23 @@
                                 // result of whatever finished before Cancel was pressed (e.g. "3 of 4"
                                 // instead of "4 of 4"), same as a normal completed run otherwise.
                                 dom.finalResultLabelText.textContent = buildCombinedLabel(processedChunkNumbers, totalChunksForLabel);
+                                if (timedOutput) {
+                                    finalResult = collectedSegments.length ? renderByMode(collectedSegments, outputMode) : stripTimestamps(finalResult);
+                                }
+                                lastResultTimed = collectedSegments.length
+                                    ? segmentsToTimed(collectedSegments)
+                                    : (textHasTimestamps(finalResult) ? segmentsToTimed(parseTimedText(finalResult)) : '');
                                 dom.finalResultLabel.classList.remove('hidden');
                                 dom.outputText.value = finalResult;
                                 dom.chunksOutputWrapper.open = false;
                                 lastResult = finalResult;
                                 try {
                                     localStorage.setItem('lastResult', finalResult);
+                                    localStorage.setItem('lastResultTimed', lastResultTimed);
                                 } catch (storageErr) {
                                     console.error('Failed to persist lastResult to localStorage:', storageErr);
                                 }
-                                transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult });
+                                transcriptionHistory.unshift({ fileName: selectedFile.name, text: finalResult, mode: outputMode, timedText: lastResultTimed });
                                 saveHistory('transcription');
                             } else {
                                 // Nothing was produced in this run (cancelled during FFmpeg slicing,
@@ -2983,6 +3655,8 @@
                         }
                         showMessage('msgApiErrorTitle', errorText, true, undefined, true);
                         dom.outputText.value = errorText;
+                        dom.downloadBar?.classList.add('hidden');
+                        hideDownloadBar = true;
                     } finally {
                         currentAbortController = null;
                         currentChunkInfo = null;
@@ -2990,6 +3664,13 @@
                         if (restorePlaceholderAfterStop) {
                             dom.outputPlaceholder.classList.remove('hidden');
                             dom.outputText.classList.add('hidden');
+                        }
+                        // stopLoading() is what makes the textarea visible again, and the try block
+                        // updated the bar while the textarea was still hidden, so refresh it here.
+                        if (hideDownloadBar) {
+                            dom.downloadBar?.classList.add('hidden');
+                        } else {
+                            updateDownloadBar();
                         }
                     }
                 });
@@ -3000,7 +3681,7 @@
 
                 dom.translateBtn.addEventListener('click', async () => {
                     const useResult = document.getElementById('source-result').classList.contains('bg-sky-500');
-                    const source = useResult ? dom.outputText.value.trim() : dom.translateInputArea.value.trim();
+                    const source = useResult ? getSourceTextForTranslation() : dom.translateInputArea.value.trim();
                     if (!source) {
                         showMessage('msgAttentionTitle', 'msgNoTextToTranslate', false);
                         return;
@@ -3094,6 +3775,76 @@
                 document.getElementById('source-result').addEventListener('click', () => setSourceToggle('result'));
                 document.getElementById('source-manual').addEventListener('click', () => setSourceToggle('manual'));
 
+                function setSummarySourceToggle(mode) {
+                    const resultBtn = document.getElementById('summary-source-result');
+                    const manualBtn = document.getElementById('summary-source-manual');
+                    const activeCls = ['bg-sky-500', 'text-white'];
+                    const inactiveCls = ['text-slate-600', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-600'];
+                    [resultBtn, manualBtn].forEach(btn => {
+                        activeCls.forEach(c => btn.classList.remove(c));
+                        inactiveCls.forEach(c => btn.classList.remove(c));
+                        btn.classList.add(...inactiveCls);
+                    });
+                    const active = mode === 'result' ? resultBtn : manualBtn;
+                    inactiveCls.forEach(c => active.classList.remove(c));
+                    active.classList.add(...activeCls);
+                    dom.summaryInputWrapper.classList.toggle('hidden', mode === 'result');
+                }
+                document.getElementById('summary-source-result').addEventListener('click', () => setSummarySourceToggle('result'));
+                document.getElementById('summary-source-manual').addEventListener('click', () => setSummarySourceToggle('manual'));
+
+                initCustomDropdown('summary-type-dropdown', () => updateSummaryTypeHint());
+                updateSummaryTypeHint();
+
+                dom.summarizeBtn.addEventListener('click', async () => {
+                    const useResult = document.getElementById('summary-source-result').classList.contains('bg-sky-500');
+                    const source = useResult ? getSourceTextForTranslation() : dom.summaryInputArea.value.trim();
+                    if (!source) {
+                        showMessage('msgAttentionTitle', 'msgNoTextToSummarize', false);
+                        return;
+                    }
+                    const summaryType = dom.summaryTypeSelect.value;
+                    const customPrompt = dom.summaryCustomPrompt.value.trim();
+                    if (summaryType === 'custom' && !customPrompt) {
+                        showMessage('msgAttentionTitle', 'msgNoCustomPrompt', false);
+                        return;
+                    }
+
+                    dom.summarizeBtn.disabled = true;
+                    dom.summarizeBtnText.textContent = translations[currentLang].msgSummarizing;
+                    dom.summarizeIcon.setAttribute('icon', 'mdi:loading');
+                    dom.summarizeIcon.classList.add('animate-spin');
+                    dom.summaryOutputPlaceholder.classList.add('hidden');
+                    dom.summaryOutputArea.classList.add('hidden');
+                    dom.summaryLoader.classList.remove('hidden');
+
+                    try {
+                        const result = await callGenericAPI(buildSummaryPrompt(summaryType, customPrompt), null, source);
+                        dom.summaryOutputArea.value = result;
+                    } catch (error) {
+                        console.error('Summarization Error:', error);
+                        const errorText = error.message || translations[currentLang].msgUnknownError;
+                        showMessage('msgApiErrorTitle', errorText, true, undefined, true);
+                        dom.summaryOutputArea.value = errorText;
+                    } finally {
+                        dom.summaryLoader.classList.add('hidden');
+                        dom.summaryOutputArea.classList.remove('hidden');
+                        dom.summarizeIcon.setAttribute('icon', 'mdi:checkbox-marked');
+                        dom.summarizeIcon.classList.remove('animate-spin');
+                        dom.summarizeBtnText.textContent = translations[currentLang].summarizeBtn;
+                        dom.summarizeBtn.disabled = false;
+                    }
+                });
+
+                dom.summaryClearBtn.addEventListener('click', () => {
+                    dom.summaryOutputArea.value = '';
+                    dom.summaryOutputPlaceholder.classList.remove('hidden');
+                    dom.summaryOutputArea.classList.add('hidden');
+                    showToast('msgResultCleared', false);
+                });
+                dom.summaryCopyBtn.addEventListener('click', () => copyTextToClipboard(dom.summaryOutputArea.value));
+                dom.summaryExpandBtn.addEventListener('click', () => openExpandModal(dom.summaryOutputArea));
+
                 document.querySelectorAll('.tone-chip').forEach(chip => {
                     chip.addEventListener('click', () => {
                         chip.classList.toggle('selected');
@@ -3108,12 +3859,16 @@
                 });
 
                 dom.restoreBtn.addEventListener('click', () => {
-                    if (lastResult) {
-                        dom.outputText.value = lastResult;
-                        dom.outputPlaceholder.classList.add('hidden');
-                        dom.outputText.classList.remove('hidden');
-                        showToast('msgHistoryRestored', false);
-                    }
+                    if (!lastResult && !lastResultTimed) return;
+                    // The dropdown is the source of truth now: restoring never switches it back, it just
+                    // renders the saved timings as whatever level is currently picked.
+                    lastResult = renderTimedForMode(lastResultTimed, lastResult);
+                    lastResultMode = getOutputMode();
+                    dom.outputText.value = lastResult;
+                    dom.outputPlaceholder.classList.add('hidden');
+                    dom.outputText.classList.remove('hidden');
+                    updateDownloadBar();
+                    showToast('msgHistoryRestored', false);
                 });
 
                 dom.clearBtn.addEventListener('click', () => {
@@ -3125,6 +3880,16 @@
                 });
 
                 dom.copyBtn.addEventListener('click', () => copyTextToClipboard(dom.outputText.value));
+                dom.clearBtn.addEventListener('click', () => dom.downloadBar?.classList.add('hidden'));
+                dom.outputText.addEventListener('input', () => {
+                    // A manual edit makes the saved timings stale, so exports follow what is on screen.
+                    lastResultTimed = '';
+                    updateDownloadBar();
+                });
+                dom.downloadTxtBtn?.addEventListener('click', () => handleResultDownload('txt'));
+                dom.downloadSrtBtn?.addEventListener('click', () => handleResultDownload('srt'));
+                dom.downloadLrcBtn?.addEventListener('click', () => handleResultDownload('lrc'));
+                dom.downloadVttBtn?.addEventListener('click', () => handleResultDownload('vtt'));
 
                 dom.translateClearBtn.addEventListener('click', () => {
                     dom.translateOutputArea.value = '';
